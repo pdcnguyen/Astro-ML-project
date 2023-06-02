@@ -29,7 +29,7 @@ def align_bands(img, wcs, coord):
     return img[0].data
 
 
-def create_tensor_from_img(start_index, end_index, filepath, ref_band="g"):
+def create_tensor_from_img(start_index, end_index, filepath, save_to_file, ref_band="g"):
     data = []
     bands = ["g", "r", "i", "u", "z"]
 
@@ -37,10 +37,12 @@ def create_tensor_from_img(start_index, end_index, filepath, ref_band="g"):
         channels = []
         ref_band_img = fits.open(f"./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits", ext=0)
 
+        if(save_to_file):
+            ref_band_img.writeto(f"./data_align/frame-{ref_band}-008162-6-0{i:03d}.fits", overwrite=True)
+
         channels.append(ref_band_img[0].data)
 
         wcs = WCS(ref_band_img[0].header)
-
 
         for band in bands:
             if band == ref_band:
@@ -50,7 +52,47 @@ def create_tensor_from_img(start_index, end_index, filepath, ref_band="g"):
 
             coord = SkyCoord(band_img[0].header["CRVAL1"], band_img[0].header["CRVAL2"], unit="deg")
 
-            channels.append(align_bands(band_img, wcs, coord))
+            band_img[0].data = align_bands(band_img, wcs, coord)
+
+            if(save_to_file):
+                band_img.writeto(f"./data_align/frame-{band}-008162-6-0{i:03d}.fits", overwrite=True)
+
+            channels.append(band_img[0].data)
+
+            band_img.close()
+
+        data.append(np.stack(channels, axis=2))
+        ref_band_img.close()
+
+    return np.stack(data, axis=0)
+
+
+def create_tensor_from_coordinate(start_index, end_index, filepath, ref_band="g"):
+    data = []
+    bands = ["g", "r", "i", "u", "z"]
+
+    for i in range(start_index, end_index + 1):
+        channels = []
+        ref_band_img = fits.open(f"./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits", ext=0)
+
+
+
+        channels.append(ref_band_img[0].data)
+
+        wcs = WCS(ref_band_img[0].header)
+
+        for band in bands:
+            if band == ref_band:
+                continue
+
+            band_img = fits.open(f"./{filepath}/frame-{band}-008162-6-0{i:03d}.fits", ext=0)
+
+            coord = SkyCoord(band_img[0].header["CRVAL1"], band_img[0].header["CRVAL2"], unit="deg")
+
+            band_img[0].data = align_bands(band_img, wcs, coord)
+
+
+            channels.append(band_img[0].data)
 
             band_img.close()
 

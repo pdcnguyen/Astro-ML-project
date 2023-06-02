@@ -32,6 +32,6 @@ def get_data_images(start_index, end_index, filepath):
     )
 
 
-def decompress():
-    run_command("gzip -d data/*.gz")
-    run_command("bzip2 -d data/*.bz2")
+def decompress(filepath):
+    run_command(f"gzip -d {filepath}/*.gz")
+    run_command(f"bzip2 -d {filepath}/*.bz2")

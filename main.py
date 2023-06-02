@@ -6,5 +6,8 @@ import process
 # acquire.decompress()
 
 
-data = process.create_tensor_from_img(90,120,'data')
+data = process.create_tensor_from_img(90,120,'data',False)
 process.save_tensor(data,'tensor_img')
+
+# process.create_tensor_from_img(90,95,'data',True)
+# process.create_rbg(90, 95)

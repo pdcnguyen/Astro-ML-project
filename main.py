@@ -6,8 +6,9 @@ import process
 # acquire.decompress()
 
 
-data = process.create_tensor_from_img(90,120,'data',False)
-process.save_tensor(data,'tensor_img')
+data = process.create_img_tensor(90,100,'data', ref_band="r")
+process.save_tensor(data,'img_tensor')
 
-# process.create_tensor_from_img(90,95,'data',True)
-# process.create_rbg(90, 95)
+data_star, data_gal = process.create_star_gal_tensor(90,100,'data',ref_band="r")
+process.save_tensor(data_star,'star_tensor')
+process.save_tensor(data_gal,'gal_tensor')

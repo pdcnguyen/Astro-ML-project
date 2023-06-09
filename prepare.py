@@ -11,3 +11,5 @@ def extract_data_from_coord(img,x,y,dist_from_center):
 
     return torch.hstack((band_0,band_1,band_2,band_3,band_4))
 
+def save_data(tensor, filepath):
+    torch.save(tensor,f'{filepath}.pt')

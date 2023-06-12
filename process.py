@@ -22,8 +22,6 @@ def align_bands(img, wcs, coord):
 
     img[0].data = np.roll(img[0].data, (shift_x, shift_y), axis=(1, 0))
 
-    print(shift_x, shift_y)
-
     return img[0].data
 
 

@@ -23,7 +23,6 @@ def get_data_images(start_index, end_index, filepath):
     for i in range(start_index, end_index + 1):
         for band in bands:
             f.write(f"frame-{band}-008162-6-0{i:03d}.fits.bz2\n")
-        f.write(f"frame-irg-008162-6-0{i:03d}.jpg\n")
 
     f.close()
 

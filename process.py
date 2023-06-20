@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.visualization import make_lupton_rgb
 import torch
+from tqdm import tqdm
+
 
 def create_rbg(g_band, r_band, i_band):
     rgb_default = make_lupton_rgb(i_band, r_band, g_band, Q=10, stretch=0.5)
@@ -27,7 +29,7 @@ def align_bands(img, wcs, coord):
 
 def pad_array(array, shape):
     padding_array = np.zeros(shape)
-    padding_array[:array.shape[0],:array.shape[1]] = array
+    padding_array[: array.shape[0], : array.shape[1]] = array
 
     return padding_array
 
@@ -36,7 +38,10 @@ def create_img_tensor(start_index, end_index, filepath, ref_band="r"):
     data = []
     bands = ["g", "r", "i", "u", "z"]
 
-    for i in range(start_index, end_index + 1):
+    for i in tqdm(range(start_index, end_index)):
+        if i == 80:
+            continue
+
         channels = []
 
         ref_band_img = fits.open(f"./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits", ext=0)
@@ -45,7 +50,7 @@ def create_img_tensor(start_index, end_index, filepath, ref_band="r"):
 
         for band in bands:
             if band == ref_band:
-                channels.append(ref_band_img[0].data)
+                channels.append(torch.from_numpy(ref_band_img[0].data.astype(np.float32)))
                 continue
 
             band_img = fits.open(f"./{filepath}/frame-{band}-008162-6-0{i:03d}.fits", ext=0)
@@ -54,61 +59,63 @@ def create_img_tensor(start_index, end_index, filepath, ref_band="r"):
 
             band_img[0].data = align_bands(band_img, wcs, coord)
 
-            channels.append(band_img[0].data)
+            channels.append(torch.from_numpy(band_img[0].data.astype(np.float32)))
 
             band_img.close()
 
-        data.append(np.stack(channels, axis=2))
+        data.append(torch.stack(channels))
         ref_band_img.close()
 
-    return np.stack(data, axis=0)
+        tensor = torch.stack(data)
+
+    return tensor
 
 
 def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r"):
-    stars = fits.open(f'./{filepath}/calibObj-008162-6-star.fits', ext=0)
-    gals = fits.open(f'./{filepath}/calibObj-008162-6-gal.fits', ext=0)
+    stars = fits.open(f"./{filepath}/calibObj-008162-6-star.fits", ext=0)
+    gals = fits.open(f"./{filepath}/calibObj-008162-6-gal.fits", ext=0)
 
-    stars_RA = np.array(stars[1].data.field('RA'))
-    stars_DEC = np.array(stars[1].data.field('DEC'))
-    stars_FIELD = np.array(stars[1].data.field('FIELD'))
+    stars_RA = np.array(stars[1].data.field("RA"))
+    stars_DEC = np.array(stars[1].data.field("DEC"))
+    stars_FIELD = np.array(stars[1].data.field("FIELD"))
 
-    gals_RA = np.array(gals[1].data.field('RA'))
-    gals_DEC = np.array(gals[1].data.field('DEC'))
-    gals_FIELD = np.array(gals[1].data.field('FIELD'))
+    gals_RA = np.array(gals[1].data.field("RA"))
+    gals_DEC = np.array(gals[1].data.field("DEC"))
+    gals_FIELD = np.array(gals[1].data.field("FIELD"))
 
     data_stars = []
     data_gals = []
 
-    max_shape_stars = (0,0)
-    max_shape_gals = (0,0)
+    max_shape_stars = (0, 0)
+    max_shape_gals = (0, 0)
 
-    for i in range(start_index,end_index+1):
+    for i in range(start_index, end_index):
+        if i == 80:
+            continue
 
-        band = fits.open(f'./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits', ext=0)
+        band = fits.open(f"./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits", ext=0)
         wcs = WCS(band[0].header)
 
-        x_star, y_star = wcs.all_world2pix(stars_RA[stars_FIELD==i], stars_DEC[stars_FIELD==i], 0)
-        x_gal, y_gal = wcs.all_world2pix(gals_RA[gals_FIELD==i], gals_DEC[gals_FIELD==i], 0)
+        x_star, y_star = wcs.all_world2pix(stars_RA[stars_FIELD == i], stars_DEC[stars_FIELD == i], 0)
+        x_gal, y_gal = wcs.all_world2pix(gals_RA[gals_FIELD == i], gals_DEC[gals_FIELD == i], 0)
 
         coord_stars = np.stack([x_star, y_star], axis=1)
         coord_gals = np.stack([x_gal, y_gal], axis=1)
 
-        if(max_shape_stars[0] < coord_stars.shape[0]):
+        if max_shape_stars[0] < coord_stars.shape[0]:
             max_shape_stars = coord_stars.shape
 
-        if(max_shape_gals[0] < coord_gals.shape[0]):
+        if max_shape_gals[0] < coord_gals.shape[0]:
             max_shape_gals = coord_gals.shape
 
         data_stars.append(coord_stars)
         data_gals.append(coord_gals)
 
+    data_stars = np.stack([pad_array(star, max_shape_stars) for star in data_stars], axis=0)
+    data_gals = np.stack([pad_array(gal, max_shape_gals) for gal in data_gals], axis=0)
 
-    data_stars = [pad_array(star, max_shape_stars) for star in data_stars]
-    data_gals = [pad_array(gal, max_shape_gals) for gal in data_gals]
-
-    return np.stack(data_stars, axis=0), np.stack(data_gals, axis=0)
+    return torch.from_numpy(data_stars), torch.from_numpy(data_gals)
 
 
 def save_tensor(data, filepath):
-    t = torch.from_numpy(data)
-    torch.save(t,f'{filepath}.pt')
+    torch.save(data, f"{filepath}.pt")

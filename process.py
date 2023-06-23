@@ -34,12 +34,12 @@ def pad_array(array, shape):
     return padding_array
 
 
-def create_img_tensor(start_index, end_index, filepath, ref_band="r"):
+def create_img_tensor(start_index, end_index, filepath, ref_band="r", test_80=False):
     data = []
     bands = ["g", "r", "i", "u", "z"]
 
     for i in tqdm(range(start_index, end_index)):
-        if i == 80:
+        if i == 80 and not test_80:
             continue
 
         channels = []
@@ -66,12 +66,12 @@ def create_img_tensor(start_index, end_index, filepath, ref_band="r"):
         data.append(torch.stack(channels))
         ref_band_img.close()
 
-        tensor = torch.stack(data)
+    tensor = torch.stack(data)
 
     return tensor
 
 
-def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r"):
+def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r", test_80=False):
     stars = fits.open(f"./{filepath}/calibObj-008162-6-star.fits", ext=0)
     gals = fits.open(f"./{filepath}/calibObj-008162-6-gal.fits", ext=0)
 
@@ -90,7 +90,7 @@ def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r"):
     max_shape_gals = (0, 0)
 
     for i in range(start_index, end_index):
-        if i == 80:
+        if i == 80 and not test_80:
             continue
 
         band = fits.open(f"./{filepath}/frame-{ref_band}-008162-6-0{i:03d}.fits", ext=0)
@@ -101,6 +101,8 @@ def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r"):
 
         coord_stars = np.stack([x_star, y_star], axis=1)
         coord_gals = np.stack([x_gal, y_gal], axis=1)
+
+        # print(f"{i}: {coord_gals.shape[0] , coord_stars.shape[0]}")
 
         if max_shape_stars[0] < coord_stars.shape[0]:
             max_shape_stars = coord_stars.shape
@@ -114,7 +116,7 @@ def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r"):
     data_stars = np.stack([pad_array(star, max_shape_stars) for star in data_stars], axis=0)
     data_gals = np.stack([pad_array(gal, max_shape_gals) for gal in data_gals], axis=0)
 
-    return torch.from_numpy(data_stars), torch.from_numpy(data_gals)
+    return torch.from_numpy(data_stars).int(), torch.from_numpy(data_gals).int()
 
 
 def save_tensor(data, filepath):

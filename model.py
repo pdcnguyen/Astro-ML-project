@@ -21,7 +21,15 @@ class DoubleConv(nn.Module):
 
 
 class CNN_with_Unet(nn.Module):
-    def __init__(self, in_channels=5, out_channels=1, features=[64, 128, 256, 512], num_of_class=2, dist_from_center=10):
+    def __init__(
+        self,
+        in_channels=5,
+        out_channels=1,
+        features=[64, 128, 256, 512],
+        num_of_class=2,
+        dist_from_center=10,
+        drop_out=0.3,
+    ):
         # UNET Convolution
         super(CNN_with_Unet, self).__init__()
         self.ups = nn.ModuleList()
@@ -51,15 +59,13 @@ class CNN_with_Unet(nn.Module):
         # Fully Connected Layer
         self.flatten = nn.Flatten()
 
-        self.fc1 = nn.Linear(
-            in_features= (2 * dist_from_center)**2, out_features=1024
-        )
+        self.fc1 = nn.Linear(in_features=(2 * dist_from_center) ** 2, out_features=512)
         self.drop1 = nn.Dropout(p=0.3)
 
-        self.fc2 = nn.Linear(in_features=1024, out_features=1024)
+        self.fc2 = nn.Linear(in_features=512, out_features=512)
         self.drop2 = nn.Dropout(p=0.3)
 
-        self.out = nn.Linear(in_features=1024, out_features=num_of_class)
+        self.out = nn.Linear(in_features=512, out_features=num_of_class)
 
     def forward(self, x):
         skip_connections = []
@@ -77,7 +83,7 @@ class CNN_with_Unet(nn.Module):
             skip_connection = skip_connections[idx // 2]
 
             if x.shape != skip_connection.shape:
-                x = TF.resize(x, size=skip_connection.shape[2:],antialias=True)
+                x = TF.resize(x, size=skip_connection.shape[2:], antialias=True)
 
             concat_skip = torch.cat((skip_connection, x), dim=1)
             x = self.ups[idx + 1](concat_skip)

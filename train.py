@@ -6,61 +6,60 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from dataset import SDSSData
+from dataset import SDSSData, SDSSData_train, SDSSData_test
 from model import CNN_with_Unet
 
 torch.cuda.is_available()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-batch_size = 20
-dist_from_center = 20
+batch_size = 50
+dist_from_center = 10
 learning_rate = 0.0001
-num_epochs = 100
-tensor_img_path = "./processed/img_tensor"
-tensor_gal_path = "./processed/gal_tensor"
-tensor_sta_path = "./processed/sta_tensor"
+num_epochs = 10
+drop_out = 0.3
 
-
-trainset = SDSSData(tensor_img_path, tensor_gal_path, tensor_sta_path, dist_from_center)
+data = SDSSData(1, dist_from_center)
+trainset = SDSSData_train(data)
+testset = SDSSData_test(data)
 
 classes = ("galaxy", "star")
 
 trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 2, len(trainset) // 2])
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
-
 valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=2)
-
-# testloader = torch.utils.data.DataLoader(
-#     testset, batch_size=batch_size, shuffle=False, num_workers=2
-# )
+testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
 
-net = CNN_with_Unet(
-    in_channels=5,
-    out_channels=1,
-    num_of_class=len(classes),
-    dist_from_center=dist_from_center,
+model = CNN_with_Unet(
+    in_channels=5, out_channels=1, num_of_class=len(classes), dist_from_center=dist_from_center, drop_out=drop_out
 )
-net.to(device)
+model.to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(net.parameters(), lr=learning_rate)
+optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+
+def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
+    print("=> Saving checkpoint")
+    torch.save(state, filename)
 
 
 def train_one_epoch():
-    net.train(True)
+    model.train(True)
 
     running_loss = 0.0
     running_accuracy = 0.0
+
+    print_batch = 100
 
     for batch_index, data in enumerate(trainloader):
         inputs, labels = data[0].to(device), data[1].to(device)
 
         optimizer.zero_grad()
 
-        outputs = net(inputs)  # shape: [batch_size, 10]
+        outputs = model(inputs)  # shape: [batch_size, 10]
         correct = torch.sum(labels == torch.argmax(outputs, dim=1)).item()
         running_accuracy += correct / batch_size
 
@@ -69,9 +68,9 @@ def train_one_epoch():
         loss.backward()
         optimizer.step()
 
-        if batch_index % 10 == 9:  # print every 10 batches
-            avg_loss_across_batches = running_loss / 10
-            avg_acc_across_batches = (running_accuracy / 10) * 100
+        if batch_index % print_batch == print_batch - 1:  # print every 100 batches
+            avg_loss_across_batches = running_loss / print_batch
+            avg_acc_across_batches = (running_accuracy / print_batch) * 100
             print(
                 "Batch {0}, Loss: {1:.3f}, Accuracy: {2:.1f}%".format(
                     batch_index + 1, avg_loss_across_batches, avg_acc_across_batches
@@ -81,8 +80,15 @@ def train_one_epoch():
             running_accuracy = 0.0
 
 
-def validate_one_epoch():
-    net.train(False)
+val_loss = 0
+val_acc = 0
+
+for epoch_index in range(num_epochs):
+    print(f"Epoch: {epoch_index + 1}\n")
+
+    train_one_epoch()
+
+    model.train(False)
     running_loss = 0.0
     running_accuracy = 0.0
 
@@ -90,7 +96,7 @@ def validate_one_epoch():
         inputs, labels = data[0].to(device), data[1].to(device)
 
         with torch.no_grad():
-            outputs = net(inputs)  # shape: [batch_size, 10]
+            outputs = model(inputs)  # shape: [batch_size, 10]
             correct = torch.sum(labels == torch.argmax(outputs, dim=1)).item()
             running_accuracy += correct / batch_size
             loss = criterion(outputs, labels)  # One number, the average batch loss
@@ -102,12 +108,16 @@ def validate_one_epoch():
     print("Val Loss: {0:.3f}, Val Accuracy: {1:.1f}%".format(avg_loss_across_batches, avg_acc_across_batches))
     print("***************************************************")
 
-
-for epoch_index in range(num_epochs):
-    print(f"Epoch: {epoch_index + 1}\n")
-
-    train_one_epoch()
-    validate_one_epoch()
+    # if (val_loss - avg_loss_across_batches) > 0 and (val_acc - avg_acc_across_batches) > 10:
+    #     break
+    # else:
+    #     checkpoint = {
+    #         "state_dict": model.state_dict(),
+    #         "optimizer": optimizer.state_dict(),
+    #     }
+    #     save_checkpoint(checkpoint)
+    #     val_acc = avg_acc_across_batches
+    #     val_loss = avg_loss_across_batches
 
 
 print("Finished Training")

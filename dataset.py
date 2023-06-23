@@ -1,8 +1,7 @@
-import os
-from PIL import Image
 from torch.utils.data import Dataset
-import numpy as np
+from sklearn.model_selection import train_test_split
 import torch
+import process
 
 
 def extract_data_from_coord(img, x, y, dist_from_center):
@@ -17,7 +16,7 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
         4 + dist_from_center,
     )  # 13 and 4 recorded max shifts after processing
 
-    for i in range(1):
+    for i in range(tensor_img.shape[0]):
         selection_gal = torch.logical_and(tensor_gal[i, :, 1] > shift_x, tensor_gal[i, :, 1] < 2048 - shift_x)
         selection_gal = torch.logical_and(selection_gal, tensor_gal[i, :, 0] > shift_y)
         selection_gal = torch.logical_and(selection_gal, tensor_gal[i, :, 0] < 1489 - shift_y)
@@ -41,29 +40,62 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
     return torch.stack(data), torch.tensor(label)
 
 
-class SDSSData(Dataset):
-    def __init__(
-        self,
-        tensor_img_path,
-        tensor_gal_path,
-        tensor_sta_path,
-        dist_from_center=5,
-        transform=None,
-    ):
+class SDSSData:
+    def __init__(self, num_batch, dist_from_center=5):
         tensor_img = torch.load(f"./processed/img_tensor_0.pt")
-        tensor_gal = torch.load(f"./processed/gal_tensor_0.pt").int()
-        tensor_sta = torch.load(f"./processed/sta_tensor_0.pt").int()
+        tensor_gal = torch.load(f"./processed/gal_tensor_0.pt")
+        tensor_sta = torch.load(f"./processed/sta_tensor_0.pt")
 
-        data_0, label_0 = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
+        data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 
-        tensor_img = torch.load(f"./processed/img_tensor_1.pt")
-        tensor_gal = torch.load(f"./processed/gal_tensor_1.pt").int()
-        tensor_sta = torch.load(f"./processed/sta_tensor_1.pt").int()
+        for i in range(1, num_batch):
+            tensor_img = torch.load(f"./processed/img_tensor_{i}.pt")
+            tensor_gal = torch.load(f"./processed/gal_tensor_{i}.pt")
+            tensor_sta = torch.load(f"./processed/sta_tensor_{i}.pt")
 
-        data_1, label_1 = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
+            data_1, label_1 = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 
-        self.data = torch.cat((data_0, data_1))
-        self.label = torch.cat((label_0, label_1))
+            data = torch.cat((data, data_1))
+            label = torch.cat((label, label_1))
+
+        train_data, test_data, train_label, test_label = train_test_split(data, label, test_size=0.2, stratify=label)
+
+        self.train_data = train_data
+        self.train_label = train_label
+
+        tensor_img = torch.load(f"./processed/img_tensor_test_80.pt")
+        tensor_gal = torch.load(f"./processed/gal_tensor_test_80.pt")
+        tensor_sta = torch.load(f"./processed/sta_tensor_test_80.pt")
+
+        data_80, label_80 = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
+
+        self.test_data = torch.cat((test_data, data_80))
+        self.test_label = torch.cat((test_label, label_80))
+
+
+class SDSSData_train(Dataset):
+    def __init__(self, data_origin, transform=None):
+        self.data = data_origin.train_data
+        self.label = data_origin.train_label
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        # if self.transform is not None:
+        #     augmentations = self.transform(image=image, mask=mask)
+        #     image = augmentations["image"]
+        #     mask = augmentations["mask"]
+
+        return self.data[index], self.label[index]
+
+
+class SDSSData_test(Dataset):
+    def __init__(self, data_origin, transform=None):
+        self.data = data_origin.test_data
+        self.label = data_origin.test_label
 
         self.transform = transform
 
@@ -80,19 +112,20 @@ class SDSSData(Dataset):
 
 
 def test():
-    tensor_img_path = "./processed/img_tensor"
-    tensor_gal_path = "./processed/gal_tensor"
-    tensor_sta_path = "./processed/sta_tensor"
+    data = SDSSData(1, 10)
 
-    trainset = SDSSData(tensor_img_path, tensor_gal_path, tensor_sta_path, 10)
+    trainset = SDSSData_train(data)
+    testset = SDSSData_test(data)
 
     train_iter = iter(trainset)
-
     image, label = next(train_iter)
-
     print(image.shape)
-    print(len(trainset))
-    print(label)
+    print(f"train size: {len(trainset)}")
+
+    train_iter = iter(testset)
+    image, label = next(train_iter)
+    print(image.shape)
+    print(f"test size: {len(testset)}")
 
     trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 2, len(trainset) // 2])
 

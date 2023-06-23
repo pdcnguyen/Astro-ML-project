@@ -10,7 +10,7 @@ def prepate_data():
 
     start_index = 80  # 80
     stop_index = 237  # 237
-    batch_size = 40
+    batch_size = 5
 
     isExist = os.path.exists("./data")
     if not isExist:

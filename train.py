@@ -210,13 +210,4 @@ def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out,
 
 
 # hard_train(0.0005, optim.RMSprop, 20, 50, 0.23, 12)
-hard_train(0.00172, optim.Adam, 20, 100, 0.27, 8, 512)
-
-# tuning()
-# batch_size: 100
-# dist_from_center: 20
-# drop_out: 0.2767618835950448
-# hidden_nodes: 512
-# learning_rate: 0.0017182279542099896
-# num_epochs: 10
-# optimizer: Adam
+# hard_train(0.00172, optim.Adam, 20, 100, 0.27, 8, 512)

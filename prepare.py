@@ -9,7 +9,7 @@ def prepate_data():
     tensor_sta_path = "./processed/sta_tensor"
 
     start_index = 80  # 80
-    stop_index = 237  # 237
+    stop_index = 130  # 237
     batch_size = 5
 
     isExist = os.path.exists("./data")

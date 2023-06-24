@@ -10,10 +10,8 @@ torch.cuda.is_available()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 classes = ("galaxy", "star")
 
-data_num = 2
 
-
-def train_one_epoch(model, optimizer, criterion, trainloader):
+def train_one_epoch(model, optimizer, criterion, trainloader, tunning=True):
     model.train(True)
 
     running_loss = 0.0
@@ -33,7 +31,7 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
         loss.backward()
         optimizer.step()
 
-        if batch_index % 100 == 100 - 1:  # print every 100 batches
+        if not tunning and batch_index % 100 == 100 - 1:  # print every 100 batches
             avg_loss_across_batches = running_loss / 100
             avg_acc_across_batches = (running_accuracy / 100) * 100
             print(
@@ -60,22 +58,17 @@ def build_model(params):
 
 
 def train_and_evaluate(params, model, trial):
-    data = SDSSData(data_num, params["dist_from_center"])
+    data = SDSSData(1, params["dist_from_center"])
     trainset = SDSSData_train(data)
-    # testset = SDSSData_test(data)
 
     trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 2, len(trainset) // 2])
-
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=params["batch_size"], shuffle=True, num_workers=2)
     valloader = torch.utils.data.DataLoader(valset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
-    # testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = getattr(optim, params["optimizer"])(model.parameters(), lr=params["learning_rate"])
 
     for epoch_index in range(params["num_epochs"]):
-        # print(f"Epoch: {epoch_index + 1}\n")
-
         train_one_epoch(model, optimizer, criterion, trainloader)
 
         model.train(False)
@@ -97,9 +90,6 @@ def train_and_evaluate(params, model, trial):
 
         trial.report(avg_acc_across_batches, epoch_index)
 
-        # print("Val Loss: {0:.3f}, Val Accuracy: {1:.1f}%".format(avg_loss_across_batches, avg_acc_across_batches))
-        # print("***************************************************")
-
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
 
@@ -108,13 +98,13 @@ def train_and_evaluate(params, model, trial):
 
 def objective(trial):
     params = {
-        "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-2, log=True),
+        "learning_rate": trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True),
         "optimizer": trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
-        "dist_from_center": trial.suggest_categorical("dist_from_center", [10, 15, 20]),
-        "batch_size": trial.suggest_categorical("batch_size", [20, 50, 100]),
-        "drop_out": trial.suggest_float("drop_out", 0.1, 0.4),
-        "num_epochs": trial.suggest_int("num_epochs", 10, 10),
-        "hidden_nodes": trial.suggest_categorical("hidden_nodes", [256, 512, 1024]),
+        "dist_from_center": trial.suggest_categorical("dist_from_center", [20]),
+        "batch_size": trial.suggest_categorical("batch_size", [50, 100]),
+        "drop_out": trial.suggest_float("drop_out", 0.2, 0.3),
+        "num_epochs": trial.suggest_int("num_epochs", 5, 10),
+        "hidden_nodes": trial.suggest_categorical("hidden_nodes", [512]),
     }
 
     model = build_model(params)
@@ -130,7 +120,7 @@ def tuning():
         storage="sqlite:///example.db",
         pruner=optuna.pruners.SuccessiveHalvingPruner(),
     )
-    study.optimize(objective, n_trials=500)
+    study.optimize(objective, n_trials=50)
 
     best_trial = study.best_trial
 
@@ -165,7 +155,7 @@ def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out,
     for epoch_index in range(num_epochs):
         print(f"Epoch: {epoch_index + 1}\n")
 
-        train_one_epoch(model, optimizer, criterion, trainloader)
+        train_one_epoch(model, optimizer, criterion, trainloader, tunning=False)
 
         model.train(False)
         running_loss = 0.0
@@ -209,5 +199,8 @@ def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out,
     print("***************************************************")
 
 
-# hard_train(0.0005, optim.RMSprop, 20, 50, 0.23, 12)
-# hard_train(0.00172, optim.Adam, 20, 100, 0.27, 8, 512)
+if __name__ == "__main__":
+    # hard_train(0.0005, optim.RMSprop, 20, 50, 0.23, 12)
+    # hard_train(0.00172, optim.Adam, 20, 100, 0.27, 8, 512)
+
+    # tuning()

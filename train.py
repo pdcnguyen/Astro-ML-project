@@ -10,6 +10,8 @@ torch.cuda.is_available()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 classes = ("galaxy", "star")
 
+data_num = 2
+
 
 def train_one_epoch(model, optimizer, criterion, trainloader):
     model.train(True)
@@ -24,23 +26,23 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
 
         outputs = model(inputs)  # shape: [batch_size, 10]
         correct = torch.sum(labels == torch.argmax(outputs, dim=1)).item()
-        # running_accuracy += correct / batch_size
+        running_accuracy += correct / 100
 
         loss = criterion(outputs, labels)
         running_loss += loss.item()
         loss.backward()
         optimizer.step()
 
-        # if batch_index % print_batch == print_batch - 1:  # print every 100 batches
-        #     avg_loss_across_batches = running_loss / print_batch
-        #     avg_acc_across_batches = (running_accuracy / print_batch) * 100
-        #     print(
-        #         "Batch {0}, Loss: {1:.3f}, Accuracy: {2:.1f}%".format(
-        #             batch_index + 1, avg_loss_across_batches, avg_acc_across_batches
-        #         )
-        #     )
-        #     running_loss = 0.0
-        #     running_accuracy = 0.0
+        if batch_index % 100 == 100 - 1:  # print every 100 batches
+            avg_loss_across_batches = running_loss / 100
+            avg_acc_across_batches = (running_accuracy / 100) * 100
+            print(
+                "Batch {0}, Loss: {1:.3f}, Accuracy: {2:.1f}%".format(
+                    batch_index + 1, avg_loss_across_batches, avg_acc_across_batches
+                )
+            )
+            running_loss = 0.0
+            running_accuracy = 0.0
 
 
 def build_model(params):
@@ -50,6 +52,7 @@ def build_model(params):
         num_of_class=len(classes),
         dist_from_center=params["dist_from_center"],
         drop_out=params["drop_out"],
+        hidden_nodes=params["hidden_nodes"],
     )
     model = model.to(device)
 
@@ -57,7 +60,7 @@ def build_model(params):
 
 
 def train_and_evaluate(params, model, trial):
-    data = SDSSData(1, params["dist_from_center"])
+    data = SDSSData(data_num, params["dist_from_center"])
     trainset = SDSSData_train(data)
     # testset = SDSSData_test(data)
 
@@ -71,7 +74,7 @@ def train_and_evaluate(params, model, trial):
     optimizer = getattr(optim, params["optimizer"])(model.parameters(), lr=params["learning_rate"])
 
     for epoch_index in range(params["num_epochs"]):
-        print(f"Epoch: {epoch_index + 1}\n")
+        # print(f"Epoch: {epoch_index + 1}\n")
 
         train_one_epoch(model, optimizer, criterion, trainloader)
 
@@ -94,8 +97,8 @@ def train_and_evaluate(params, model, trial):
 
         trial.report(avg_acc_across_batches, epoch_index)
 
-        print("Val Loss: {0:.3f}, Val Accuracy: {1:.1f}%".format(avg_loss_across_batches, avg_acc_across_batches))
-        print("***************************************************")
+        # print("Val Loss: {0:.3f}, Val Accuracy: {1:.1f}%".format(avg_loss_across_batches, avg_acc_across_batches))
+        # print("***************************************************")
 
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()
@@ -109,8 +112,9 @@ def objective(trial):
         "optimizer": trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
         "dist_from_center": trial.suggest_categorical("dist_from_center", [10, 15, 20]),
         "batch_size": trial.suggest_categorical("batch_size", [20, 50, 100]),
-        "drop_out": trial.suggest_float("drop_out", 0.1, 0.3),
-        "num_epochs": trial.suggest_int("num_epochs", 5, 15),
+        "drop_out": trial.suggest_float("drop_out", 0.1, 0.4),
+        "num_epochs": trial.suggest_int("num_epochs", 10, 10),
+        "hidden_nodes": trial.suggest_categorical("hidden_nodes", [256, 512, 1024]),
     }
 
     model = build_model(params)
@@ -126,7 +130,7 @@ def tuning():
         storage="sqlite:///example.db",
         pruner=optuna.pruners.SuccessiveHalvingPruner(),
     )
-    study.optimize(objective, n_trials=100)
+    study.optimize(objective, n_trials=500)
 
     best_trial = study.best_trial
 
@@ -134,17 +138,18 @@ def tuning():
         print("{}: {}".format(key, value))
 
 
-def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out, num_epochs):
+def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out, num_epochs, hidden_nodes):
     model = CNN_with_Unet(
         in_channels=5,
         out_channels=1,
         num_of_class=len(classes),
         dist_from_center=dist_from_center,
         drop_out=drop_out,
+        hidden_nodes=hidden_nodes,
     )
     model = model.to(device)
 
-    data = SDSSData(1, dist_from_center)
+    data = SDSSData(10, dist_from_center)
     trainset = SDSSData_train(data)
     testset = SDSSData_test(data)
 
@@ -204,4 +209,14 @@ def hard_train(learning_rate, optimizer, dist_from_center, batch_size, drop_out,
     print("***************************************************")
 
 
-hard_train(0.0005, optim.RMSprop, 20, 50, 0.23, 12)
+# hard_train(0.0005, optim.RMSprop, 20, 50, 0.23, 12)
+hard_train(0.00172, optim.Adam, 20, 100, 0.27, 8, 512)
+
+# tuning()
+# batch_size: 100
+# dist_from_center: 20
+# drop_out: 0.2767618835950448
+# hidden_nodes: 512
+# learning_rate: 0.0017182279542099896
+# num_epochs: 10
+# optimizer: Adam

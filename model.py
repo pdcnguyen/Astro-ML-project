@@ -29,6 +29,7 @@ class CNN_with_Unet(nn.Module):
         num_of_class=2,
         dist_from_center=10,
         drop_out=0.3,
+        hidden_nodes=512,
     ):
         # UNET Convolution
         super(CNN_with_Unet, self).__init__()
@@ -59,13 +60,13 @@ class CNN_with_Unet(nn.Module):
         # Fully Connected Layer
         self.flatten = nn.Flatten()
 
-        self.fc1 = nn.Linear(in_features=(2 * dist_from_center) ** 2, out_features=512)
-        self.drop1 = nn.Dropout(p=0.3)
+        self.fc1 = nn.Linear(in_features=(2 * dist_from_center) ** 2, out_features=hidden_nodes)
+        self.drop1 = nn.Dropout(p=drop_out)
 
-        self.fc2 = nn.Linear(in_features=512, out_features=512)
-        self.drop2 = nn.Dropout(p=0.3)
+        self.fc2 = nn.Linear(in_features=hidden_nodes, out_features=hidden_nodes)
+        self.drop2 = nn.Dropout(p=drop_out)
 
-        self.out = nn.Linear(in_features=512, out_features=num_of_class)
+        self.out = nn.Linear(in_features=hidden_nodes, out_features=num_of_class)
 
     def forward(self, x):
         skip_connections = []

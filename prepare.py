@@ -10,7 +10,6 @@ def prepate_data():
 
     start_index = 80  # 80
     stop_index = 130  # 237
-    batch_size = 5
 
     isExist = os.path.exists("./data")
     if not isExist:
@@ -28,22 +27,12 @@ def prepate_data():
 
     # ============== align bands and create tensor into parts, spare my poor machine ===============
 
-    for i in range((stop_index - start_index) // batch_size + 1):
-        start = start_index + (i * batch_size)
-        stop = start_index + (i + 1) * batch_size
-        if start == stop_index:
-            continue
-        if stop > stop_index:
-            stop = stop_index
+    img_tensor = process.create_img_tensor(start_index, stop_index, "data", ref_band="r")
+    process.save_tensor(img_tensor, f"{tensor_img_path}")
 
-        img_tensor = process.create_img_tensor(start_index + (i * batch_size), stop, "data", ref_band="r")
-        process.save_tensor(img_tensor, f"{tensor_img_path}_{i}")
-
-        star_tensor, gal_tensor = process.create_star_gal_tensor(
-            start_index + (i * batch_size), stop, "data", ref_band="r"
-        )
-        process.save_tensor(star_tensor, f"{tensor_sta_path}_{i}")
-        process.save_tensor(gal_tensor, f"{tensor_gal_path}_{i}")
+    star_tensor, gal_tensor = process.create_star_gal_tensor(start_index, stop_index, "data", ref_band="r")
+    process.save_tensor(star_tensor, f"{tensor_sta_path}")
+    process.save_tensor(gal_tensor, f"{tensor_gal_path}")
 
     # ============== align bands and create tensor of pic 80===============
 

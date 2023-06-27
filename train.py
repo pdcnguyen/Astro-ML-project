@@ -5,10 +5,6 @@ import optuna
 import albumentations as A
 from sklearn.metrics import f1_score
 
-# from ray import tune
-# from ray.tune import CLIReporter
-# from ray.tune.schedulers import ASHAScheduler
-
 from dataset import SDSSData, SDSSData_train, SDSSData_test
 from model import CNN_with_Unet
 
@@ -102,12 +98,6 @@ def train_and_evaluate(params, model, trial):
         train_one_epoch(model, optimizer, criterion, trainloader)
 
         val_loss, val_accuracy, val_f1 = validate_one_epoch(model, criterion, valloader)
-        print(f"Val Loss: {val_loss:.3f}, Val Accuracy: {val_accuracy:.1f}%, Val f1: {val_f1:.1f}")
-
-        # trial.report(val_accuracy, epoch_index)
-
-        # if trial.should_prune():
-        #     raise optuna.exceptions.TrialPruned()
 
     return val_accuracy, val_f1
 
@@ -181,25 +171,23 @@ def objective(trial):
     return accuracy, f1
 
 
-def tuning():
+def tune_parameters(transform=None):
+    if transform == None:
+        study_name = f"maximizing-accuracy-f1"
+    else:
+        study_name = f"maximizing-accuracy-f1-transform"
+
     study = optuna.create_study(
-        study_name="maximizing-accuracy-f1",
+        study_name=study_name,
         directions=["maximize", "maximize"],
         sampler=optuna.samplers.TPESampler(),
-        storage="sqlite:///example.db",
-        # pruner=optuna.pruners.SuccessiveHalvingPruner(),
+        storage="sqlite:///results.db",  # just to show how man do paralellization, my machine too weak for paralellization *cry*
+        load_if_exists=True,
     )
     study.optimize(objective, n_trials=100)
 
-    best_trial = study.best_trial
-
-    for key, value in best_trial.params.items():
-        print("{}: {}".format(key, value))
-
 
 if __name__ == "__main__":
-    train_transform = None
-
     # params = {
     #     "learning_rate": 0.00172,
     #     "optimizer": optim.Adam,
@@ -213,4 +201,5 @@ if __name__ == "__main__":
 
     # hard_train_and_test(params)
 
-    tuning()
+    train_transform = None
+    tune_parameters()

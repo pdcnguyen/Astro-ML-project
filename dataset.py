@@ -48,7 +48,10 @@ class SDSSData:
         tensor_sta = torch.load(f"./processed/sta_tensor.pt")
 
         if is_tunning:  # use only 5 images for hyper-parameters tunning
-            data, label = create_learning_data(tensor_img[:2], tensor_gal[:2], tensor_sta[:2], dist_from_center)
+            indices = torch.randperm(len(tensor_img))[:5]
+            data, label = create_learning_data(
+                tensor_img[indices], tensor_gal[indices], tensor_sta[indices], dist_from_center
+            )
         else:
             data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 

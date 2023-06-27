@@ -48,7 +48,7 @@ class SDSSData:
         tensor_sta = torch.load(f"./processed/sta_tensor.pt")
 
         if is_tunning:  # use only 5 images for hyper-parameters tunning
-            data, label = create_learning_data(tensor_img[:5], tensor_gal[:5], tensor_sta[:5], dist_from_center)
+            data, label = create_learning_data(tensor_img[:2], tensor_gal[:2], tensor_sta[:2], dist_from_center)
         else:
             data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 
@@ -82,8 +82,8 @@ class SDSSData_train(Dataset):
         label = self.label[index]
         if self.transform is not None:
             augmentations = self.transform(image=image.numpy())
-            image = augmentations["image"]
-        return torch.from_numpy(image), label
+            image = torch.from_numpy(augmentations["image"])
+        return image, label
 
 
 class SDSSData_test(Dataset):

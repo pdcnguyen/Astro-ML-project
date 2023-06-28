@@ -191,20 +191,6 @@ def tune_parameters(n_trials, transform=None):
 
 if __name__ == "__main__":
     # params = {
-    #     "learning_rate": 0.0001,
-    #     "optimizer": optim.RMSprop,
-    #     "dist_from_center": 10,
-    #     "hidden_nodes": 512,
-    #     "batch_size": 100,
-    #     "drop_out": 0.2,
-    #     "num_epochs": 10,
-    #     "transform": None,
-    # }
-    # hard_train_and_test(params)
-
-    tune_parameters(500)
-
-    # params = {
     #     "learning_rate": 0.00172,
     #     "optimizer": optim.Adam,
     #     "dist_from_center": 20,
@@ -212,6 +198,33 @@ if __name__ == "__main__":
     #     "batch_size": 100,
     #     "drop_out": 0.27,
     #     "num_epochs": 8,
-    #     "transform": None,
+    #     "transform": train_transform,
     # }
     # hard_train_and_test(params)
+
+    # train_transform = A.Compose(
+    #     [A.Rotate(limit=35, p=0.2)],
+    # )
+    # tune_parameters(200, "Rotate")
+
+    train_transform = A.Compose(
+        [
+            A.HorizontalFlip(p=0.2),
+            A.VerticalFlip(p=0.2),
+        ],
+    )
+    tune_parameters(200, "Flip")
+
+    train_transform = A.Compose(
+        [
+            A.OpticalDistortion(p=0.2),
+        ],
+    )
+    tune_parameters(200, "Distort")
+
+    train_transform = A.Compose(
+        [
+            A.GaussNoise(p=0.2),
+        ],
+    )
+    tune_parameters(200, "Noice")

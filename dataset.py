@@ -2,7 +2,14 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 import torch
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
+
+tensor_img = torch.load(f"./processed/img_tensor.pt")
+tensor_gal = torch.load(f"./processed/gal_tensor.pt")
+tensor_sta = torch.load(f"./processed/sta_tensor.pt")
+
+tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
+tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
+tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
 
 
 def extract_data_from_coord(img, x, y, dist_from_center):
@@ -43,15 +50,8 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
 
 class SDSSData:
     def __init__(self, dist_from_center=5, is_tunning=False):
-        tensor_img = torch.load(f"./processed/img_tensor.pt")
-        tensor_gal = torch.load(f"./processed/gal_tensor.pt")
-        tensor_sta = torch.load(f"./processed/sta_tensor.pt")
-
         if is_tunning:  # use only 5 images for hyper-parameters tunning
-            indices = torch.randperm(len(tensor_img))[:5]
-            data, label = create_learning_data(
-                tensor_img[indices], tensor_gal[indices], tensor_sta[indices], dist_from_center
-            )
+            data, label = create_learning_data(tensor_img[:3], tensor_gal[:3], tensor_sta[:3], dist_from_center)
         else:
             data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 
@@ -60,11 +60,7 @@ class SDSSData:
         self.train_data = train_data
         self.train_label = train_label
 
-        tensor_img = torch.load(f"./processed/img_tensor_test_80.pt")
-        tensor_gal = torch.load(f"./processed/gal_tensor_test_80.pt")
-        tensor_sta = torch.load(f"./processed/sta_tensor_test_80.pt")
-
-        data_80, label_80 = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
+        data_80, label_80 = create_learning_data(tensor_img_80, tensor_gal_80, tensor_sta_80, dist_from_center)
 
         self.test_data = torch.cat((test_data, data_80))
         self.test_label = torch.cat((test_label, label_80))

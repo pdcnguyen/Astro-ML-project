@@ -50,7 +50,7 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
 
 class SDSSData:
     def __init__(self, dist_from_center=5, is_tunning=False):
-        if is_tunning:  # use only 5 images for hyper-parameters tunning
+        if is_tunning:  # use only 3 images for hyper-parameters tunning
             data, label = create_learning_data(tensor_img[:3], tensor_gal[:3], tensor_sta[:3], dist_from_center)
         else:
             data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)

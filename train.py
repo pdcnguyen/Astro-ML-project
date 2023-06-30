@@ -23,13 +23,13 @@ class EarlyStopper:
         self.counter = 0
         self.min_validation_loss = np.inf
         self.state_dict = None
-        self.best_accuracy = 0
+        self.best_f1 = 0
 
-    def early_stop(self, validation_loss, model, accuracy):
+    def early_stop(self, validation_loss, model, f1):
         if validation_loss < self.min_validation_loss:
             self.min_validation_loss = validation_loss
             self.state_dict = deepcopy(model.state_dict())
-            self.best_accuracy = accuracy
+            self.best_f1 = f1
             self.counter = 0
         elif validation_loss > (self.min_validation_loss + self.min_delta):
             self.counter += 1
@@ -46,8 +46,8 @@ class EarlyStopper:
     def load_best_model(self):
         return self.state_dict
 
-    def get_best_accuracy(self):
-        return self.best_accuracy
+    def get_best_f1(self):
+        return self.best_f1
 
 
 def train_one_epoch(model, optimizer, criterion, trainloader):
@@ -111,7 +111,7 @@ def validate(model, criterion, valloader):
     return avg_loss, avg_acc, avg_f1
 
 
-def prepare_training(params, model, is_tunning, transform):
+def prepare_training(params, model, transform, is_tunning):
     data = SDSSData(params["dist_from_center"], is_tunning=is_tunning)
 
     trainset = SDSSData_train(data, transform=transform)
@@ -134,20 +134,20 @@ def train_and_evaluate(params, model, transform, trial):
         params, model, transform, is_tunning=True
     )
 
-    for epoch_index in range(15):
+    for epoch_index in range(12):
         train_one_epoch(model, optimizer, criterion, trainloader)
 
         val_loss, val_accuracy, val_f1 = validate(model, criterion, valloader)
 
-        if early_stopper.early_stop(val_loss, model, val_accuracy):
+        if early_stopper.early_stop(val_loss, model, val_f1):
             break
 
-        trial.report(val_accuracy, epoch_index)
+        trial.report(val_f1, epoch_index)
 
         if trial.should_prune():
             raise optuna.TrialPruned()
 
-    return early_stopper.get_best_accuracy()
+    return early_stopper.get_best_f1()
 
 
 def hard_train_and_test(params, transform=None):
@@ -168,7 +168,7 @@ def hard_train_and_test(params, transform=None):
     testset = SDSSData_test(params["dist_from_center"])
     testloader = torch.utils.data.DataLoader(testset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
 
-    for epoch_index in range(15):
+    for epoch_index in range(12):
         print(f"Epoch: {epoch_index + 1}\n")
 
         epoch_run_results = train_one_epoch(model, optimizer, criterion, trainloader)
@@ -212,9 +212,9 @@ def objective(trial, transform):
     )
     model = model.to(device)
 
-    accuracy = train_and_evaluate(params, model, transform, trial)
+    f1 = train_and_evaluate(params, model, transform, trial)
 
-    return accuracy
+    return f1
 
 
 def tune_parameters(n_trials, study_name, transform=None):

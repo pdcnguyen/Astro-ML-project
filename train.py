@@ -229,6 +229,7 @@ def objective(trial, transform):
 
 
 def tune_parameters(n_trials, study_name, transform=None):
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         study_name=study_name,
         direction="maximize",

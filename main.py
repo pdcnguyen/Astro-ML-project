@@ -1,4 +1,3 @@
-import prepare
 import train
 
 import optuna
@@ -7,35 +6,38 @@ import albumentations as A
 
 if __name__ == "__main__":
     # BASE TRAIN, NO TUNNING===============================
-
+    print("BASE TRAIN, NO TUNNING")
     params = {
-        "batch_size": 70,
-        "dist_from_center": 15,
-        "drop_out": 0.20879658201895385,
-        "hidden_nodes": 256,
-        "learning_rate": 0.0005881835636133336,
-        "optimizer": "Adam",
+        "batch_size": 50,
+        "dist_from_center": 10,
+        "drop_out": 0.3,
+        "hidden_nodes": 512,
+        "learning_rate": 0.0001,
+        "optimizer": "RMSprop",
     }
     train.hard_train_and_test(params)
 
     # TRAIN WITH TUNNING===============================
+    print("TRAIN WITH TUNNING")
     study_name = "maximizing-accuracy"
     train.tune_parameters(1, study_name)
     study = optuna.load_study(study_name=study_name, storage="sqlite:///results.db")
 
     train.hard_train_and_test(study.best_trial.params)
 
-    # TRAIN WITH TUNNING AND ROTATE AUGMENT===============================
+    # TRAIN WITH TUNNING AND SHEAR AUGMENT===============================
+    print("TRAIN WITH TUNNING AND SHEAR AUGMENT")
     transform = A.Compose(
-        [A.Rotate(limit=35, p=0.2)],
+        [A.Affine(shear=(-45, 45))],
     )
-    study_name = "maximizing-accuracy-rotate"
+    study_name = "maximizing-accuracy-shear"
     train.tune_parameters(1, study_name, transform)
     study = optuna.load_study(study_name=study_name, storage="sqlite:///results.db")
 
     train.hard_train_and_test(study.best_trial.params, transform)
 
     # TRAIN WITH TUNNING AND FLIP AUGMENT===============================
+    print("TRAIN WITH TUNNING AND FLIP AUGMENT")
     transform = A.Compose(
         [
             A.HorizontalFlip(p=0.2),
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     train.hard_train_and_test(study.best_trial.params, transform)
 
     # TRAIN WITH TUNNING AND DISTORT AUGMENT===============================
-
+    print("TRAIN WITH TUNNING AND DISTORT AUGMENT")
     transform = A.Compose(
         [
             A.OpticalDistortion(p=0.2),
@@ -62,7 +64,7 @@ if __name__ == "__main__":
     train.hard_train_and_test(study.best_trial.params, transform)
 
     # TRAIN WITH TUNNING AND NOISE AUGMENT===============================
-
+    print("TRAIN WITH TUNNING AND NOISE AUGMENT")
     transform = A.Compose(
         [
             A.GaussNoise(p=0.2),

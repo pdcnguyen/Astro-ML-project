@@ -6,8 +6,9 @@ from sklearn.metrics import f1_score
 import albumentations as A
 import numpy as np
 from copy import deepcopy
+from torch.utils.data import WeightedRandomSampler
 
-from dataset import SDSSData, SDSSData_train, SDSSData_test
+from dataset import SDSSData, SDSSData_train, SDSSData_val, SDSSData_test
 from model import CNN_with_Unet
 
 torch.cuda.is_available()
@@ -73,10 +74,10 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
         loss.backward()
         optimizer.step()
 
-        if batch_index % 20 == 20 - 1:  # print every 20 batches
-            avg_loss = running_loss / 20
-            avg_acc = (running_accuracy / 20) * 100
-            avg_f1 = running_f1 / 20
+        if batch_index % 100 == 100 - 1:  # print every 100 batches
+            avg_loss = running_loss / 100
+            avg_acc = (running_accuracy / 100) * 100
+            avg_f1 = running_f1 / 100
             epoch_run_results.append((avg_loss, avg_acc, avg_f1))
             running_loss = 0.0
             running_accuracy = 0.0
@@ -110,18 +111,29 @@ def validate(model, criterion, valloader):
     return avg_loss, avg_acc, avg_f1
 
 
-def train_and_evaluate(params, model, transform, trial):
-    data = SDSSData(params["dist_from_center"], is_tunning=True)
-    trainset = SDSSData_train(data, transform=transform)
+def prepare_training(params, model, is_tunning, transform):
+    data = SDSSData(params["dist_from_center"], is_tunning=is_tunning)
 
-    trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 5, len(trainset) // 5])
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=params["batch_size"], shuffle=True, num_workers=2)
+    trainset = SDSSData_train(data, transform=transform)
+    sampler = WeightedRandomSampler(weights=trainset.sample_weights, num_samples=len(trainset), replacement=True)
+    trainloader = torch.utils.data.DataLoader(trainset, sampler=sampler, batch_size=params["batch_size"], num_workers=2)
+
+    valset = SDSSData_val(data, transform=transform)
     valloader = torch.utils.data.DataLoader(valset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = getattr(optim, params["optimizer"])(model.parameters(), lr=params["learning_rate"])
 
     early_stopper = EarlyStopper(patience=2, min_delta=0.05)
+
+    return trainloader, valloader, criterion, optimizer, early_stopper
+
+
+def train_and_evaluate(params, model, transform, trial):
+    trainloader, valloader, criterion, optimizer, early_stopper = prepare_training(
+        params, model, transform, is_tunning=True
+    )
+
     for epoch_index in range(15):
         train_one_epoch(model, optimizer, criterion, trainloader)
 
@@ -149,20 +161,12 @@ def hard_train_and_test(params, transform=None):
     )
     model = model.to(device)
 
-    data = SDSSData(params["dist_from_center"])
-    trainset = SDSSData_train(data, transform=transform)
-    testset = SDSSData_test(data)
+    trainloader, valloader, criterion, optimizer, early_stopper = prepare_training(
+        params, model, transform, is_tunning=False
+    )
 
-    trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 5, len(trainset) // 5])
-
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=params["batch_size"], shuffle=True, num_workers=2)
-    valloader = torch.utils.data.DataLoader(valset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
+    testset = SDSSData_test(params["dist_from_center"])
     testloader = torch.utils.data.DataLoader(testset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
-
-    criterion = nn.CrossEntropyLoss()
-    optimizer = getattr(optim, params["optimizer"])(model.parameters(), lr=params["learning_rate"])
-
-    early_stopper = EarlyStopper(patience=2, min_delta=0.05)
 
     for epoch_index in range(15):
         print(f"Epoch: {epoch_index + 1}\n")
@@ -182,25 +186,10 @@ def hard_train_and_test(params, transform=None):
 
     # test
     test_loss, test_accuracy, test_f1 = validate(model, criterion, testloader)
-    print(f"Test Loss: {test_loss:.3f}, Test Accuracy: {test_accuracy:.1f}%, Test f1: {test_f1:.2f}")
+    print(f"Using img_80: Test Loss: {test_loss:.3f}, Test Accuracy: {test_accuracy:.1f}%, Test f1: {test_f1:.2f}")
     print("***************************************************")
 
     return model
-
-
-def predict(model, data):
-    testloader = torch.utils.data.DataLoader(data, batch_size=70, shuffle=False, num_workers=2)
-
-    prediction = []
-
-    for i, data in enumerate(testloader):
-        inputs = data.to(device)
-
-        with torch.no_grad():
-            outputs = model(inputs)
-            prediction.append(torch.argmax(outputs, dim=1))
-
-    return torch.hstack(prediction)
 
 
 def objective(trial, transform):
@@ -229,6 +218,7 @@ def objective(trial, transform):
 
 
 def tune_parameters(n_trials, study_name, transform=None):
+    print("Tuning in process...")
     optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         study_name=study_name,
@@ -243,15 +233,3 @@ def tune_parameters(n_trials, study_name, transform=None):
     study.optimize(
         func, n_trials=n_trials, n_jobs=1
     )  # more n_jobs if you want parallelization, might be buggy combining with seed
-
-
-if __name__ == "__main__":
-    params = {
-        "batch_size": 70,
-        "dist_from_center": 15,
-        "drop_out": 0.20879658201895385,
-        "hidden_nodes": 256,
-        "learning_rate": 0.0005881835636133336,
-        "optimizer": "Adam",
-    }
-    hard_train_and_test(params)

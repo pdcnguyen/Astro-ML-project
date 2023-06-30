@@ -50,8 +50,8 @@ def prepate_data(start_index, stop_index):
 
     # ============== getting data and unpack ===============
 
-    get_data(start_index, stop_index, "data")
-    decompress("data")
+    # get_data(start_index, stop_index, "data")
+    # decompress("data")
 
     # ============== align bands and create tensor into parts, spare my poor machine ===============
 

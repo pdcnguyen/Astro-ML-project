@@ -46,30 +46,46 @@ class SDSSData:
         tensor_gal = torch.load(f"./processed/gal_tensor.pt")
         tensor_sta = torch.load(f"./processed/sta_tensor.pt")
 
-        tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
-        tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
-        tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
-
         if is_tunning:  # use only 3 images for hyper-parameters tunning
             data, label = create_learning_data(tensor_img[:3], tensor_gal[:3], tensor_sta[:3], dist_from_center)
         else:
             data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
 
-        train_data, test_data, train_label, test_label = train_test_split(data, label, test_size=0.2, stratify=label)
+        train_data, val_data, train_label, val_label = train_test_split(data, label, test_size=0.2, stratify=label)
 
         self.train_data = train_data
         self.train_label = train_label
 
-        data_80, label_80 = create_learning_data(tensor_img_80, tensor_gal_80, tensor_sta_80, dist_from_center)
-
-        self.test_data = torch.cat((test_data, data_80))
-        self.test_label = torch.cat((test_label, label_80))
+        self.val_data = val_data
+        self.val_label = val_label
 
 
 class SDSSData_train(Dataset):
     def __init__(self, data_origin, transform=None):
         self.data = data_origin.train_data
         self.label = data_origin.train_label
+
+        class_counts = data_origin.train_label.unique(return_counts=True)[1]
+        self.sample_weights = [1 / class_counts[i] for i in data_origin.train_label]
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        image = self.data[index]
+        label = self.label[index]
+        if self.transform is not None:
+            augmentations = self.transform(image=image.numpy())
+            image = torch.from_numpy(augmentations["image"])
+        return image, label
+
+
+class SDSSData_val(Dataset):
+    def __init__(self, data_origin, transform=None):
+        self.data = data_origin.val_data
+        self.label = data_origin.val_label
 
         self.transform = transform
 
@@ -86,9 +102,12 @@ class SDSSData_train(Dataset):
 
 
 class SDSSData_test(Dataset):
-    def __init__(self, data_origin):
-        self.data = data_origin.test_data
-        self.label = data_origin.test_label
+    def __init__(self, dist_from_center):
+        tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
+        tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
+        tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
+
+        self.data, self.label = create_learning_data(tensor_img_80, tensor_gal_80, tensor_sta_80, dist_from_center)
 
     def __len__(self):
         return len(self.data)

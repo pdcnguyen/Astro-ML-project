@@ -85,7 +85,7 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
     return epoch_run_results
 
 
-def validate_one_epoch(model, criterion, valloader):
+def validate(model, criterion, valloader):
     model.train(False)
     running_loss = 0.0
     running_accuracy = 0.0
@@ -125,7 +125,7 @@ def train_and_evaluate(params, model, transform, trial):
     for epoch_index in range(15):
         train_one_epoch(model, optimizer, criterion, trainloader)
 
-        val_loss, val_accuracy, val_f1 = validate_one_epoch(model, criterion, valloader)
+        val_loss, val_accuracy, val_f1 = validate(model, criterion, valloader)
 
         if early_stopper.early_stop(val_loss, model, val_accuracy):
             break
@@ -172,7 +172,7 @@ def hard_train_and_test(params, transform=None):
         for loss, accuracy, f1 in epoch_run_results:
             print(f"loss: {loss:.3f}, accuracy: {accuracy:.1f}%, f1: {f1:.2f}")
 
-        val_loss, val_accuracy, val_f1 = validate_one_epoch(model, criterion, valloader)
+        val_loss, val_accuracy, val_f1 = validate(model, criterion, valloader)
         print(f"Val Loss: {val_loss:.3f}, Val Accuracy: {val_accuracy:.1f}%, Val f1: {val_f1:.2f}")
         print("***************************************************")
 
@@ -181,9 +181,26 @@ def hard_train_and_test(params, transform=None):
             break
 
     # test
-    test_loss, test_accuracy, test_f1 = validate_one_epoch(model, criterion, testloader)
+    test_loss, test_accuracy, test_f1 = validate(model, criterion, testloader)
     print(f"Test Loss: {test_loss:.3f}, Test Accuracy: {test_accuracy:.1f}%, Test f1: {test_f1:.2f}")
     print("***************************************************")
+
+    return model
+
+
+def predict(model, data):
+    testloader = torch.utils.data.DataLoader(data, batch_size=70, shuffle=False, num_workers=2)
+
+    prediction = []
+
+    for i, data in enumerate(testloader):
+        inputs = data.to(device)
+
+        with torch.no_grad():
+            outputs = model(inputs)
+            prediction.append(torch.argmax(outputs, dim=1))
+
+    return torch.hstack(prediction)
 
 
 def objective(trial, transform):
@@ -211,18 +228,7 @@ def objective(trial, transform):
     return accuracy
 
 
-def tune_parameters(n_trials, transform_name=None, transform=None):
-    if transform_name == None:
-        study_name = f"maximizing-accuracy"
-    elif transform_name == "Rotate":
-        study_name = f"maximizing-accuracy-rotate"
-    elif transform_name == "Flip":
-        study_name = f"maximizing-accuracy-flip"
-    elif transform_name == "Distort":
-        study_name = f"maximizing-accuracy-distort"
-    elif transform_name == "Noise":
-        study_name = f"maximizing-accuracy-noise"
-
+def tune_parameters(n_trials, study_name, transform=None):
     study = optuna.create_study(
         study_name=study_name,
         direction="maximize",
@@ -239,8 +245,6 @@ def tune_parameters(n_trials, transform_name=None, transform=None):
 
 
 if __name__ == "__main__":
-    # tune_parameters(100)
-
     params = {
         "batch_size": 70,
         "dist_from_center": 15,
@@ -250,79 +254,3 @@ if __name__ == "__main__":
         "optimizer": "Adam",
     }
     hard_train_and_test(params)
-
-    # # ===============================
-    # transform = A.Compose(
-    #     [A.Rotate(limit=35, p=0.2)],
-    # )
-    # tune_parameters(100, "Rotate")
-
-    # params = {
-    #     "batch_size": 50,
-    #     "dist_from_center": 15,
-    #     "drop_out": 0.17789086371197324,
-    #     "hidden_nodes": 256,
-    #     "learning_rate": 0.00017384951180295915,
-    #     "optimizer": "Adam",
-    # }
-
-    # hard_train_and_test(params,transform)
-
-    # ===============================
-    # transform = A.Compose(
-    #     [
-    #         A.HorizontalFlip(p=0.2),
-    #         A.VerticalFlip(p=0.2),
-    #     ],
-    # )
-    # tune_parameters(2, "Flip", transform)
-
-    # params = {
-    #     "batch_size": 100,
-    #     "dist_from_center": 20,
-    #     "drop_out": 0.2836984186758677,
-    #     "hidden_nodes": 256,
-    #     "learning_rate": 0.0002686802819473838,
-    #     "optimizer": "Adam",
-    # }
-
-    # hard_train_and_test(params, transform)
-
-    # # ===============================
-
-    # transform = A.Compose(
-    #     [
-    #         A.OpticalDistortion(p=0.2),
-    #     ],
-    # )
-    # tune_parameters(100, "Distort", transform)
-
-    # params = {
-    #     "batch_size": 100,
-    #     "dist_from_center": 15,
-    #     "drop_out": 0.28942132493859546,
-    #     "hidden_nodes": 256,
-    #     "learning_rate": 0.00045652817054764956,
-    #     "optimizer": "Adam",
-    # }
-
-    # hard_train_and_test(params, transform)
-
-    # # ===============================
-
-    # transform = A.Compose(
-    #     [
-    #         A.GaussNoise(p=0.2),
-    #     ],
-    # )
-    # tune_parameters(100, "Noise")
-
-    # params = {
-    #     "batch_size": 70,
-    #     "dist_from_center": 20,
-    #     "drop_out": 0.2716639026925446,
-    #     "hidden_nodes": 256,
-    #     "learning_rate": 0.00012934002493055115,
-    #     "optimizer": "Adam",
-    # }
-    # hard_train_and_test(params, transform)

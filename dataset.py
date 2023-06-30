@@ -3,14 +3,6 @@ from sklearn.model_selection import train_test_split
 import torch
 import albumentations as A
 
-tensor_img = torch.load(f"./processed/img_tensor.pt")
-tensor_gal = torch.load(f"./processed/gal_tensor.pt")
-tensor_sta = torch.load(f"./processed/sta_tensor.pt")
-
-tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
-tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
-tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
-
 
 def extract_data_from_coord(img, x, y, dist_from_center):
     return img[:, x - dist_from_center : x + dist_from_center, y - dist_from_center : y + dist_from_center]
@@ -50,6 +42,14 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
 
 class SDSSData:
     def __init__(self, dist_from_center=5, is_tunning=False):
+        tensor_img = torch.load(f"./processed/img_tensor.pt")
+        tensor_gal = torch.load(f"./processed/gal_tensor.pt")
+        tensor_sta = torch.load(f"./processed/sta_tensor.pt")
+
+        tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
+        tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
+        tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
+
         if is_tunning:  # use only 3 images for hyper-parameters tunning
             data, label = create_learning_data(tensor_img[:3], tensor_gal[:3], tensor_sta[:3], dist_from_center)
         else:
@@ -97,7 +97,7 @@ class SDSSData_test(Dataset):
         return self.data[index], self.label[index]
 
 
-def test():
+if __name__ == "__main__":
     train_transform = A.Compose(
         [
             A.Rotate(limit=35, p=0.5),
@@ -123,7 +123,3 @@ def test():
         inputs, labels = data[0], data[1]
         print(inputs.shape)
         print(labels.shape)
-
-
-if __name__ == "__main__":
-    test()

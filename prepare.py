@@ -1,15 +1,44 @@
-import acquire
 import process
 import os
 
 
-def prepate_data():
+def run_command(command):
+    stream = os.popen(command)
+    output = stream.read()
+    print(output)
+
+
+def get_data(start_index, end_index, filepath):
+    run_command(
+        f"wget https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-gal.fits.gz -P ./{filepath}"
+    )
+    run_command(
+        f"wget https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-star.fits.gz -P ./{filepath}"
+    )
+
+    f = open("spec-list.txt", "w")
+    bands = ["r", "g", "i", "u", "z"]
+
+    for i in range(start_index, end_index + 1):
+        for band in bands:
+            f.write(f"frame-{band}-008162-6-0{i:03d}.fits.bz2\n")
+
+    f.close()
+
+    run_command(
+        f'wget -i spec-list.txt -r --no-parent -nd -B "https://data.sdss.org/sas/dr17/eboss/photoObj/frames/301/8162/6/" -P ./{filepath}'
+    )
+
+
+def decompress(filepath):
+    run_command(f"gzip -d {filepath}/*.gz")
+    run_command(f"bzip2 -d {filepath}/*.bz2")
+
+
+def prepate_data(start_index, stop_index):
     tensor_img_path = "./processed/img_tensor"
     tensor_gal_path = "./processed/gal_tensor"
     tensor_sta_path = "./processed/sta_tensor"
-
-    start_index = 80  # 80
-    stop_index = 130  # 237
 
     isExist = os.path.exists("./data")
     if not isExist:
@@ -21,9 +50,8 @@ def prepate_data():
 
     # ============== getting data and unpack ===============
 
-    # acquire.get_data_galaxy_and_star("data")
-    # acquire.get_data_images(start_index, stop_index, "data")
-    # acquire.decompress("data")
+    get_data(start_index, stop_index, "data")
+    decompress("data")
 
     # ============== align bands and create tensor into parts, spare my poor machine ===============
 
@@ -45,4 +73,4 @@ def prepate_data():
 
 
 if __name__ == "__main__":
-    prepate_data()
+    prepate_data(80, 130)

@@ -17,7 +17,7 @@ classes = ("galaxy", "star")
 
 
 class EarlyStopper:
-    def __init__(self, patience=5, min_delta=0.5):
+    def __init__(self, patience=2, min_delta=0.05):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
@@ -39,7 +39,7 @@ class EarlyStopper:
             validation_loss < (self.min_validation_loss + self.min_delta) and validation_loss > self.min_validation_loss
         ):
             self.counter += self.patience / 3.0
-            if self.counter >= self.patience + 1:
+            if self.counter >= self.patience:
                 return True
         return False
 

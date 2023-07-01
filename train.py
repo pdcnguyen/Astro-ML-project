@@ -69,7 +69,7 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
         running_accuracy += correct / len(labels)
 
         loss = criterion(outputs, labels)
-        running_f1 += f1_score(labels.cpu(), torch.argmax(outputs.cpu(), dim=1))
+        running_f1 += f1_score(labels.cpu(), torch.argmax(outputs.cpu(), dim=1), zero_division=0)
         running_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -134,7 +134,7 @@ def train_and_evaluate(params, model, transform, trial):
         params, model, transform, is_tunning=True
     )
 
-    for epoch_index in range(12):
+    for epoch_index in range(10):
         train_one_epoch(model, optimizer, criterion, trainloader)
 
         val_loss, val_accuracy, val_f1 = validate(model, criterion, valloader)
@@ -168,7 +168,7 @@ def hard_train_and_test(params, transform=None):
     testset = SDSSData_test(params["dist_from_center"])
     testloader = torch.utils.data.DataLoader(testset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
 
-    for epoch_index in range(12):
+    for epoch_index in range(10):
         print(f"Epoch: {epoch_index + 1}\n")
 
         epoch_run_results = train_one_epoch(model, optimizer, criterion, trainloader)
@@ -197,7 +197,7 @@ def objective(trial, transform):
         "learning_rate": trial.suggest_float("learning_rate", 1e-4, 1e-2, log=True),
         "optimizer": trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"]),
         "dist_from_center": trial.suggest_categorical("dist_from_center", [10, 15, 20]),
-        "batch_size": trial.suggest_categorical("batch_size", [50, 70, 100]),
+        "batch_size": trial.suggest_categorical("batch_size", [32, 64, 128]),
         "drop_out": trial.suggest_float("drop_out", 0.1, 0.3),
         "hidden_nodes": trial.suggest_categorical("hidden_nodes", [256, 512, 1024]),
     }
@@ -219,7 +219,7 @@ def objective(trial, transform):
 
 def tune_parameters(n_trials, study_name, transform=None):
     print("Tuning in process...")
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    # optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         study_name=study_name,
         direction="maximize",

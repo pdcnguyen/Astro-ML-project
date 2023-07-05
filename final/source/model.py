@@ -19,7 +19,7 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
-
+# Implementation inspired by Aladdin Persson - PyTorch Image Segmentation Tutorial with U-NET: everything from scratch baby
 class CNN_with_Unet(nn.Module):
     def __init__(
         self,

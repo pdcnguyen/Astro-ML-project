@@ -6,3 +6,4 @@ report
 .vscode
 __pycache__
 spec-list.txt
+source/data

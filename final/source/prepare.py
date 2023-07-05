@@ -1,4 +1,4 @@
-import process
+import process as process
 import os
 
 
@@ -10,10 +10,10 @@ def run_command(command):
 
 def get_data(start_index, end_index, filepath):
     run_command(
-        f"wget https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-gal.fits.gz -P ./{filepath}"
+        f"wget -nc https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-gal.fits.gz -P ./{filepath}"
     )
     run_command(
-        f"wget https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-star.fits.gz -P ./{filepath}"
+        f"wget -nc https://data.sdss.org/sas/dr17/eboss/sweeps/dr13_final/301/calibObj-008162-6-star.fits.gz -P ./{filepath}"
     )
 
     f = open("spec-list.txt", "w")
@@ -26,7 +26,7 @@ def get_data(start_index, end_index, filepath):
     f.close()
 
     run_command(
-        f'wget -i spec-list.txt -r --no-parent -nd -B "https://data.sdss.org/sas/dr17/eboss/photoObj/frames/301/8162/6/" -P ./{filepath}'
+        f'wget -i spec-list.txt -r --no-parent -nd -B "https://data.sdss.org/sas/dr17/eboss/photoObj/frames/301/8162/6/" -nc -P ./{filepath}'
     )
 
 
@@ -50,8 +50,8 @@ def prepate_data(start_index, stop_index):
 
     # ============== getting data and unpack ===============
 
-    # get_data(start_index, stop_index, "data")
-    # decompress("data")
+    get_data(start_index, stop_index, "data")
+    decompress("data")
 
     # ============== align bands and create tensor into parts, spare my poor machine ===============
 

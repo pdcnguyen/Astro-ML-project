@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import optuna
 from sklearn.metrics import f1_score
-import albumentations as A
 import numpy as np
 from copy import deepcopy
 from torch.utils.data import WeightedRandomSampler
@@ -219,7 +218,7 @@ def objective(trial, transform):
 
 def tune_parameters(n_trials, study_name, transform=None):
     print("Tuning in process...")
-    # optuna.logging.set_verbosity(optuna.logging.WARNING)
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     study = optuna.create_study(
         study_name=study_name,
         direction="maximize",

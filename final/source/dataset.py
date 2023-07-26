@@ -17,25 +17,27 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
     )  # 13 and 4 recorded max shifts after processing
 
     for i in range(tensor_img.shape[0]):
-        selection_gal = torch.logical_and(tensor_gal[i, :, 1] > shift_x, tensor_gal[i, :, 1] < 2048 - shift_x)
-        selection_gal = torch.logical_and(selection_gal, tensor_gal[i, :, 0] > shift_y)
-        selection_gal = torch.logical_and(selection_gal, tensor_gal[i, :, 0] < 1489 - shift_y)
+        gal_list_in_i = tensor_gal[i]
+        selection_gal = torch.logical_and(gal_list_in_i[:, 1] > shift_x, gal_list_in_i[:, 1] < 2048 - shift_x)
+        selection_gal = torch.logical_and(selection_gal, gal_list_in_i[:, 0] > shift_y)
+        selection_gal = torch.logical_and(selection_gal, gal_list_in_i[:, 0] < 1489 - shift_y)
 
         data += [
             extract_data_from_coord(tensor_img[i], coord[1], coord[0], dist_from_center)
-            for coord in tensor_gal[i][selection_gal]
+            for coord in gal_list_in_i[selection_gal]
         ]
-        label += [0] * len(tensor_gal[i][selection_gal])  # galaxy as 0
+        label += [0] * len(gal_list_in_i[selection_gal])  # galaxy as 0
 
-        selection_sta = torch.logical_and(tensor_sta[i, :, 1] > shift_x, tensor_sta[i, :, 1] < 2048 - shift_x)
-        selection_sta = torch.logical_and(selection_sta, tensor_sta[i, :, 0] > shift_y)
-        selection_sta = torch.logical_and(selection_sta, tensor_sta[i, :, 0] < 1489 - shift_y)
+        sta_list_in_i = tensor_sta[i]
+        selection_sta = torch.logical_and(sta_list_in_i[:, 1] > shift_x, sta_list_in_i[:, 1] < 2048 - shift_x)
+        selection_sta = torch.logical_and(selection_sta, sta_list_in_i[:, 0] > shift_y)
+        selection_sta = torch.logical_and(selection_sta, sta_list_in_i[:, 0] < 1489 - shift_y)
 
         data += [
             extract_data_from_coord(tensor_img[i], coord[1], coord[0], dist_from_center)
-            for coord in tensor_sta[i][selection_sta]
+            for coord in sta_list_in_i[selection_sta]
         ]
-        label += [1] * len(tensor_sta[i][selection_sta])  # star as 1
+        label += [1] * len(sta_list_in_i[selection_sta])  # star as 1
 
     return torch.stack(data), torch.tensor(label)
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
     data = SDSSData(10)
 
     trainset = SDSSData_train(data, transform=train_transform)
-    testset = SDSSData_test(data)
+    testset = SDSSData_test(5)
 
     trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 2, len(trainset) // 2])
 

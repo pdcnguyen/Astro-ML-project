@@ -86,8 +86,6 @@ def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r", test_
     data_stars = []
     data_gals = []
 
-    max_shape_stars = (0, 0)
-    max_shape_gals = (0, 0)
 
     for i in range(start_index, end_index):
         if i == 80 and not test_80:
@@ -99,24 +97,13 @@ def create_star_gal_tensor(start_index, end_index, filepath, ref_band="r", test_
         x_star, y_star = wcs.all_world2pix(stars_RA[stars_FIELD == i], stars_DEC[stars_FIELD == i], 0)
         x_gal, y_gal = wcs.all_world2pix(gals_RA[gals_FIELD == i], gals_DEC[gals_FIELD == i], 0)
 
-        coord_stars = np.stack([x_star, y_star], axis=1)
-        coord_gals = np.stack([x_gal, y_gal], axis=1)
+        coord_stars = np.stack([x_star, y_star], axis=1).astype(int)
+        coord_gals = np.stack([x_gal, y_gal], axis=1).astype(int)
 
-        # print(f"{i}: {coord_gals.shape[0] , coord_stars.shape[0]}")
+        data_stars.append(torch.from_numpy(coord_stars))
+        data_gals.append(torch.from_numpy(coord_gals))
 
-        if max_shape_stars[0] < coord_stars.shape[0]:
-            max_shape_stars = coord_stars.shape
-
-        if max_shape_gals[0] < coord_gals.shape[0]:
-            max_shape_gals = coord_gals.shape
-
-        data_stars.append(coord_stars)
-        data_gals.append(coord_gals)
-
-    data_stars = np.stack([pad_array(star, max_shape_stars) for star in data_stars], axis=0)
-    data_gals = np.stack([pad_array(gal, max_shape_gals) for gal in data_gals], axis=0)
-
-    return torch.from_numpy(data_stars).int(), torch.from_numpy(data_gals).int()
+    return data_stars, data_gals
 
 
 def save_tensor(data, filepath):

@@ -168,7 +168,7 @@ def hard_train_and_test(params, transform=None):
     testloader = torch.utils.data.DataLoader(testset, batch_size=params["batch_size"], shuffle=False, num_workers=2)
 
     for epoch_index in range(10):
-        print(f"Epoch: {epoch_index + 1}\n")
+        print(f"Epoch: {epoch_index + 1}")
 
         epoch_run_results = train_one_epoch(model, optimizer, criterion, trainloader)
 
@@ -230,5 +230,5 @@ def tune_parameters(n_trials, study_name, transform=None):
 
     func = lambda trial: objective(trial, transform)
     study.optimize(
-        func, n_trials=n_trials, n_jobs=1
+        func, n_trials=n_trials, n_jobs=1, show_progress_bar=True
     )  # more n_jobs if you want parallelization, might be buggy combining with seed

@@ -1,29 +1,25 @@
-import train as train
-
+import os
 import optuna
 import albumentations as A
+import train
+import prepare
 
 
 def load_and_run_study(study_name, transform=None):
-    train.tune_parameters(50, study_name, transform)
+    train.tune_parameters(200, study_name, transform)
     study = optuna.load_study(study_name=study_name, storage="sqlite:///results.db")
-    print(f'Best params: {study.best_trial.params}')
+    print(f"Best params: {study.best_trial.params}")
 
     return study
 
 
 if __name__ == "__main__":
-    # BASE TRAIN, NO TUNNING===============================
-    print("BASE TRAIN, NO TUNNING")
-    params = {
-        "batch_size": 50,
-        "dist_from_center": 10,
-        "drop_out": 0.3,
-        "hidden_nodes": 512,
-        "learning_rate": 0.0001,
-        "optimizer": "RMSprop",
-    }
-    train.hard_train_and_test(params)
+    # Setting up
+    start_index = 80
+    stop_index = 160
+    test_files_list = [80, 120, 160]
+
+    prepare.prepate_data(start_index, stop_index, test_files_list)
 
     # # TRAIN WITH TUNNING===============================
     print("TRAIN WITH TUNNING")

@@ -1,4 +1,3 @@
-import os
 import optuna
 import albumentations as A
 import train
@@ -20,6 +19,8 @@ if __name__ == "__main__":
     test_files_list = [80, 120, 160]
 
     prepare.prepate_data(start_index, stop_index, test_files_list)
+
+    exit(0)
 
     # # TRAIN WITH TUNNING===============================
     print("TRAIN WITH TUNNING")

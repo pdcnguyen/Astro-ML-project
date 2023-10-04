@@ -1,14 +1,23 @@
+import os
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 import torch
+import torch.nn.functional as F
 import albumentations as A
 
 
-def extract_data_from_coord(img, x, y, dist_from_center):
-    return img[:, x - dist_from_center : x + dist_from_center, y - dist_from_center : y + dist_from_center]
+def extract_data_and_normalize(img, x, y, dist_from_center):
+    cut_out = img[
+        :,
+        x - dist_from_center : x + dist_from_center,
+        y - dist_from_center : y + dist_from_center,
+    ]
+    cut_out = torch.stack([F.normalize(a) for a in cut_out])
+
+    return cut_out
 
 
-def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5):
+def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=15):
     label = []
     data = []
     shift_x, shift_y = (
@@ -17,43 +26,65 @@ def create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center=5)
     )  # 13 and 4 recorded max shifts after processing
 
     for i in range(tensor_img.shape[0]):
-        gal_list_in_i = tensor_gal[i]
-        selection_gal = torch.logical_and(gal_list_in_i[:, 1] > shift_x, gal_list_in_i[:, 1] < 2048 - shift_x)
-        selection_gal = torch.logical_and(selection_gal, gal_list_in_i[:, 0] > shift_y)
-        selection_gal = torch.logical_and(selection_gal, gal_list_in_i[:, 0] < 1489 - shift_y)
+        for j in [0, 1]:  # decode galaxy as 0, star as 1
+            coord_list = tensor_gal[i] if j == 0 else tensor_sta[i]
 
-        data += [
-            extract_data_from_coord(tensor_img[i], coord[1], coord[0], dist_from_center)
-            for coord in gal_list_in_i[selection_gal]
-        ]
-        label += [0] * len(gal_list_in_i[selection_gal])  # galaxy as 0
+            # remove coord that might not have sufficient data
+            selection = torch.logical_and(
+                coord_list[:, 1] > shift_x, coord_list[:, 1] < 2048 - shift_x
+            )
+            selection = torch.logical_and(selection, coord_list[:, 0] > shift_y)
+            selection = torch.logical_and(selection, coord_list[:, 0] < 1489 - shift_y)
 
-        sta_list_in_i = tensor_sta[i]
-        selection_sta = torch.logical_and(sta_list_in_i[:, 1] > shift_x, sta_list_in_i[:, 1] < 2048 - shift_x)
-        selection_sta = torch.logical_and(selection_sta, sta_list_in_i[:, 0] > shift_y)
-        selection_sta = torch.logical_and(selection_sta, sta_list_in_i[:, 0] < 1489 - shift_y)
+            filtered_coord = coord_list[selection]
 
-        data += [
-            extract_data_from_coord(tensor_img[i], coord[1], coord[0], dist_from_center)
-            for coord in sta_list_in_i[selection_sta]
-        ]
-        label += [1] * len(sta_list_in_i[selection_sta])  # star as 1
+            data += [
+                extract_data_and_normalize(
+                    tensor_img[i], coord[1], coord[0], dist_from_center
+                )
+                for coord in filtered_coord
+            ]
+            label += [j] * len(filtered_coord)
 
     return torch.stack(data), torch.tensor(label)
 
 
 class SDSSData:
-    def __init__(self, dist_from_center=5, is_tunning=False):
-        tensor_img = torch.load(f"./processed/img_tensor.pt")
-        tensor_gal = torch.load(f"./processed/gal_tensor.pt")
-        tensor_sta = torch.load(f"./processed/sta_tensor.pt")
+    def __init__(self, dist_from_center=15, is_tunning=False):
+        data = []
+        label = []
 
         if is_tunning:  # use only 4 images for hyper-parameters tunning
-            data, label = create_learning_data(tensor_img[:4], tensor_gal[:4], tensor_sta[:4], dist_from_center)
-        else:
-            data, label = create_learning_data(tensor_img, tensor_gal, tensor_sta, dist_from_center)
+            tensor_img = torch.load("./data/processed/img_tensor_0.pt")
+            tensor_gal = torch.load("./data/processed/gal_tensor_0.pt")
+            tensor_sta = torch.load("./data/processed/sta_tensor_0.pt")
 
-        train_data, val_data, train_label, val_label = train_test_split(data, label, test_size=0.2, stratify=label)
+            extracted_data = create_learning_data(
+                tensor_img[:4], tensor_gal[:4], tensor_sta[:4], dist_from_center
+            )
+            data.append(extracted_data[0])
+            label.append(extracted_data[1])
+        else:
+            i = 0
+            while os.path.isfile(f"./data/processed/img_tensor_{i}.pt"):
+                tensor_img = torch.load(f"./data/processed/img_tensor_{i}.pt")
+                tensor_gal = torch.load(f"./data/processed/gal_tensor_{i}.pt")
+                tensor_sta = torch.load(f"./data/processed/sta_tensor_{i}.pt")
+
+                extracted_data = create_learning_data(
+                    tensor_img, tensor_gal, tensor_sta, dist_from_center
+                )
+
+                data.append(extracted_data[0])
+                label.append(extracted_data[1])
+                i += 1
+
+        data = torch.cat(data)
+        label = torch.cat(label)
+
+        train_data, val_data, train_label, val_label = train_test_split(
+            data, label, test_size=0.2, stratify=label
+        )
 
         self.train_data = train_data
         self.train_label = train_label
@@ -105,11 +136,13 @@ class SDSSData_val(Dataset):
 
 class SDSSData_test(Dataset):
     def __init__(self, dist_from_center):
-        tensor_img_80 = torch.load(f"./processed/img_tensor_test_80.pt")
-        tensor_gal_80 = torch.load(f"./processed/gal_tensor_test_80.pt")
-        tensor_sta_80 = torch.load(f"./processed/sta_tensor_test_80.pt")
+        tensor_img = torch.load("./data/processed/img_tensor_test.pt")
+        tensor_gal = torch.load("./data/processed/gal_tensor_test.pt")
+        tensor_sta = torch.load("./data/processed/sta_tensor_test.pt")
 
-        self.data, self.label = create_learning_data(tensor_img_80, tensor_gal_80, tensor_sta_80, dist_from_center)
+        self.data, self.label = create_learning_data(
+            tensor_img, tensor_gal, tensor_sta, dist_from_center
+        )
 
     def __len__(self):
         return len(self.data)
@@ -129,16 +162,19 @@ if __name__ == "__main__":
             A.GaussNoise(p=0.8),
         ],
     )
-    data = SDSSData(10)
-
+    data = SDSSData(5, False)
     trainset = SDSSData_train(data, transform=train_transform)
+    valset = SDSSData_val(data, transform=train_transform)
+
     testset = SDSSData_test(5)
 
-    trainset, valset = torch.utils.data.random_split(trainset, [len(trainset) - len(trainset) // 2, len(trainset) // 2])
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=500, shuffle=True, num_workers=2
+    )
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=500, shuffle=True, num_workers=2)
-
-    valloader = torch.utils.data.DataLoader(valset, batch_size=500, shuffle=False, num_workers=2)
+    valloader = torch.utils.data.DataLoader(
+        valset, batch_size=500, shuffle=False, num_workers=2
+    )
 
     for batch_index, data in enumerate(trainloader):
         inputs, labels = data[0], data[1]

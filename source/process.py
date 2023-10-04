@@ -29,13 +29,6 @@ def align_bands(img, wcs, coord):
     return img[0].data
 
 
-def pad_array(array, shape):
-    padding_array = np.zeros(shape)
-    padding_array[: array.shape[0], : array.shape[1]] = array
-
-    return padding_array
-
-
 def create_img_tensor(index_list, filepath, ref_band="r"):
     data = []
     bands = ["g", "r", "i", "u", "z"]

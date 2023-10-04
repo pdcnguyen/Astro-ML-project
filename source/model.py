@@ -19,6 +19,7 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 # Implementation inspired by Aladdin Persson - PyTorch Image Segmentation Tutorial with U-NET: everything from scratch baby
 class CNN_with_Unet(nn.Module):
     def __init__(
@@ -60,7 +61,9 @@ class CNN_with_Unet(nn.Module):
         # Fully Connected Layer
         self.flatten = nn.Flatten()
 
-        self.fc1 = nn.Linear(in_features=(2 * dist_from_center) ** 2, out_features=hidden_nodes)
+        self.fc1 = nn.Linear(
+            in_features=(2 * dist_from_center) ** 2, out_features=hidden_nodes
+        )
         self.drop1 = nn.Dropout(p=drop_out)
 
         self.fc2 = nn.Linear(in_features=hidden_nodes, out_features=hidden_nodes)

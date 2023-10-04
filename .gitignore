@@ -1,9 +1,4 @@
-env
-data
-processed
-unet
-report
-.vscode
-__pycache__
-spec-list.txt
+source/env
+source/__pycache__
 source/data
+source/file-list.txt

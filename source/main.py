@@ -19,3 +19,5 @@ if __name__ == "__main__":
     study = load_and_run_study(study_name, transform)
 
     train.full_train_and_test(study.best_trial.params, transform)
+
+    # Best params: {'batch_size': 32, 'drop_out': 0.29846878370550334, 'hidden_nodes': 256, 'learning_rate': 0.0003620066758014293, 'optimizer': 'Adam'}

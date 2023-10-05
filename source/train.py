@@ -103,7 +103,7 @@ def prepare_training(params, model, trainset, valset):
         model.parameters(), lr=params["learning_rate"]
     )
 
-    early_stopper = EarlyStopper(patience=3, min_delta=0.01)
+    early_stopper = EarlyStopper(patience=3, min_delta=0.03)
 
     return trainloader, valloader, criterion, optimizer, early_stopper
 
@@ -118,7 +118,7 @@ def train_and_evaluate(params, model, trainset, valset, trial):
 
         val_loss, val_accuracy, score = validate(model, criterion, valloader)
 
-        if early_stopper.early_stop(model, score):
+        if early_stopper.early_stop(model, val_loss, score):
             break
 
         trial.report(score, epoch_index)
@@ -207,7 +207,7 @@ def full_train_and_test(params, transform=None):
             model, criterion, valloader, verbose=True
         )
 
-        if early_stopper.early_stop(model, val_metric_score):
+        if early_stopper.early_stop(model, val_loss, val_metric_score):
             model.load_state_dict(early_stopper.load_best_model())
             break
 

@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn.functional as F
-import albumentations as A
 
 
 def extract_data_and_normalize(img, x, y, dist_from_center):
@@ -149,34 +148,3 @@ class SDSSData_test(Dataset):
 
     def __getitem__(self, index):
         return self.data[index], self.label[index]
-
-
-if __name__ == "__main__":
-    train_transform = A.Compose(
-        [
-            A.Rotate(limit=35, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.Affine(shear=(-45, 45), p=0.3),
-            A.OpticalDistortion(p=0.5),
-            A.GaussNoise(p=0.8),
-        ],
-    )
-    data = SDSSData(5, False)
-    trainset = SDSSData_train(data, transform=train_transform)
-    valset = SDSSData_val(data, transform=train_transform)
-
-    testset = SDSSData_test(5)
-
-    trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=500, shuffle=True, num_workers=2
-    )
-
-    valloader = torch.utils.data.DataLoader(
-        valset, batch_size=500, shuffle=False, num_workers=2
-    )
-
-    for batch_index, data in enumerate(trainloader):
-        inputs, labels = data[0], data[1]
-        print(inputs.shape)
-        print(labels.shape)

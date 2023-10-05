@@ -6,19 +6,6 @@ import numpy as np
 import torch
 
 
-# from astropy.visualization import make_lupton_rgb
-# import matplotlib.pyplot as plt
-
-
-# def create_rbg(g_band, r_band, i_band):
-#     rgb_default = make_lupton_rgb(i_band, r_band, g_band, Q=10, stretch=0.5)
-
-#     plt.figure()
-#     plt.axis("off")
-#     plt.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.0, wspace=0.0, hspace=0.0)
-#     plt.imshow(rgb_default, origin="lower")
-
-
 def align_bands(img, wcs, coord):
     x, y = wcs.world_to_pixel(coord)
     shift_x = int(x[()] - img[0].header["CRPIX1"])

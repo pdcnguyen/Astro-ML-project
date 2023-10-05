@@ -7,25 +7,22 @@ class EarlyStopper:
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
-        self.min_validation_loss = np.inf
+        self.min_score = np.inf
         self.state_dict = None
         self.best_metric_score = 0
 
-    def early_stop(self, validation_loss, model, score):
-        if validation_loss < self.min_validation_loss:
-            self.min_validation_loss = validation_loss
+    def early_stop(self, model, score):
+        if score < self.min_score:
+            self.min_score = score
             self.state_dict = deepcopy(model.state_dict())
             self.best_metric_score = score
             self.counter = 0
-        elif validation_loss > (self.min_validation_loss + self.min_delta):
+        elif score > (self.min_score + self.min_delta):
             self.counter += 1
             if self.counter >= self.patience:
                 return True
-        elif (
-            validation_loss < (self.min_validation_loss + self.min_delta)
-            and validation_loss > self.min_validation_loss
-        ):
-            self.counter += self.patience / 3.0
+        else:
+            self.counter += 0.5
             if self.counter >= self.patience:
                 return True
         return False

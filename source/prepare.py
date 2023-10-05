@@ -1,6 +1,8 @@
 import os
 import process
 
+from config import START_INDEX, STOP_INDEX, TEST_FILES_lIST
+
 
 def run_command(command):
     stream = os.popen(command)
@@ -81,3 +83,7 @@ def prepate_data(start_index, stop_index, test_index_list):
     )
     process.save_tensor(star_tensor_test, f"{tensor_sta_path}_test")
     process.save_tensor(gal_tensor_test, f"{tensor_gal_path}_test")
+
+
+if __name__ == "__main__":
+    prepate_data(START_INDEX, STOP_INDEX, TEST_FILES_lIST)

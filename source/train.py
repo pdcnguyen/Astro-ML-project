@@ -2,18 +2,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import optuna
-from sklearn.metrics import roc_auc_score, classification_report
+from sklearn.metrics import f1_score, classification_report, roc_auc_score
 from torch.utils.data import WeightedRandomSampler
 
 from dataset import SDSSData, SDSSData_train, SDSSData_val, SDSSData_test
 from model import CNN_with_Unet
-from earlyStopper import EarlyStopper
+from early_stopper import EarlyStopper
+from config import DIST_FROM_CENTER, MAX_EPOCH
 
 torch.cuda.is_available()
 device = "cuda" if torch.cuda.is_available() else "cpu"
 classes = ("galaxy", "star")
-DIST_FROM_CENTER = 15
-MAX_EPOCH = 20
 
 
 def train_one_epoch(model, optimizer, criterion, trainloader):
@@ -35,8 +34,8 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
         running_accuracy += correct / len(labels)
 
         loss = criterion(outputs, labels)
-        running_metric_score += roc_auc_score(
-            labels.cpu(), torch.argmax(outputs.cpu(), dim=1)
+        running_metric_score += f1_score(
+            labels.cpu(), torch.argmax(outputs.cpu(), dim=1), zero_division=0
         )
         running_loss += loss.item()
         loss.backward()
@@ -54,7 +53,7 @@ def train_one_epoch(model, optimizer, criterion, trainloader):
     return epoch_run_results
 
 
-def validate(model, criterion, valloader, is_tunning=True):
+def validate(model, criterion, valloader, verbose=False):
     model.train(False)
     running_loss = 0.0
     running_accuracy = 0.0
@@ -70,21 +69,19 @@ def validate(model, criterion, valloader, is_tunning=True):
 
             loss = criterion(outputs, labels)
             running_loss += loss.item()
-            running_metric_score += roc_auc_score(
-                labels.cpu(), torch.argmax(outputs.cpu(), dim=1)
+            running_metric_score += f1_score(
+                labels.cpu(), torch.argmax(outputs.cpu(), dim=1), zero_division=0
             )
-            if not is_tunning:
-                print(
-                    classification_report(
-                        labels.cpu(),
-                        torch.argmax(outputs.cpu(), dim=1),
-                        target_names=["gals", "stars"],
-                    )
-                )
 
     avg_loss = running_loss / len(valloader)
     avg_acc = (running_accuracy / len(valloader)) * 100
     avg_metric_score = running_metric_score / len(valloader)
+
+    if verbose:
+        print(
+            f"Val Loss: {avg_loss:.3f}, Val Accuracy: {avg_acc:.1f}%, Val metric_score: {avg_metric_score:.2f}"
+        )
+        print("***************************************************")
 
     return avg_loss, avg_acc, avg_metric_score
 
@@ -98,7 +95,7 @@ def prepare_training(params, model, trainset, valset):
     )
 
     valloader = torch.utils.data.DataLoader(
-        valset, batch_size=params["batch_size"], shuffle=False, num_workers=2
+        valset, batch_size=params["batch_size"], num_workers=2
     )
 
     criterion = nn.CrossEntropyLoss()
@@ -106,7 +103,7 @@ def prepare_training(params, model, trainset, valset):
         model.parameters(), lr=params["learning_rate"]
     )
 
-    early_stopper = EarlyStopper(patience=3, min_delta=0.05)
+    early_stopper = EarlyStopper(patience=3, min_delta=0.01)
 
     return trainloader, valloader, criterion, optimizer, early_stopper
 
@@ -121,7 +118,7 @@ def train_and_evaluate(params, model, trainset, valset, trial):
 
         val_loss, val_accuracy, score = validate(model, criterion, valloader)
 
-        if early_stopper.early_stop(val_loss, model, score):
+        if early_stopper.early_stop(model, score):
             break
 
         trial.report(score, epoch_index)
@@ -151,7 +148,7 @@ def objective(trial, transform, trainset, valset):
     )
     model = model.to(device)
 
-    metric_score = train_and_evaluate(params, model, transform, trainset, valset, trial)
+    metric_score = train_and_evaluate(params, model, trainset, valset, trial)
 
     return metric_score
 
@@ -170,16 +167,13 @@ def tune_parameters(n_trials, study_name, transform=None):
 
     data = SDSSData(DIST_FROM_CENTER, is_tunning=True)
     trainset = SDSSData_train(data, transform=transform)
-    trainset = WeightedRandomSampler(
-        weights=trainset.sample_weights, num_samples=len(trainset), replacement=True
-    )
     valset = SDSSData_val(data, transform=transform)
 
     func = lambda trial: objective(trial, transform, trainset, valset)
     study.optimize(func, n_trials=n_trials, n_jobs=1, show_progress_bar=True)
 
 
-def hard_train_and_test(params, transform=None):
+def full_train_and_test(params, transform=None):
     model = CNN_with_Unet(
         in_channels=5,
         out_channels=1,
@@ -199,11 +193,6 @@ def hard_train_and_test(params, transform=None):
         params, model, trainset, valset
     )
 
-    testset = SDSSData_test(DIST_FROM_CENTER)
-    testloader = torch.utils.data.DataLoader(
-        testset, batch_size=params["batch_size"], shuffle=True, num_workers=2
-    )
-
     for epoch_index in range(MAX_EPOCH):
         print(f"Epoch: {epoch_index + 1}")
 
@@ -213,24 +202,50 @@ def hard_train_and_test(params, transform=None):
             print(
                 f"loss: {loss:.3f}, accuracy: {accuracy:.1f}%, metric_score: {metric_score:.2f}"
             )
-
-        val_loss, val_accuracy, val_metric_score = validate(model, criterion, valloader)
-        print(
-            f"Val Loss: {val_loss:.3f}, Val Accuracy: {val_accuracy:.1f}%, Val metric_score: {val_metric_score:.2f}"
+        print("VAL SET")
+        val_loss, val_accuracy, val_metric_score = validate(
+            model, criterion, valloader, verbose=True
         )
-        print("***************************************************")
 
-        if early_stopper.early_stop(val_loss, model, val_accuracy):
+        if early_stopper.early_stop(model, val_metric_score):
             model.load_state_dict(early_stopper.load_best_model())
             break
 
     # test
-    test_loss, test_accuracy, test_metric_score = validate(
-        model, criterion, testloader, is_tunning=False
+    testset = SDSSData_test(DIST_FROM_CENTER)
+    testloader = torch.utils.data.DataLoader(
+        testset, batch_size=len(testset), shuffle=True, num_workers=2
     )
-    print(
-        f"Test Loss: {test_loss:.3f}, Test Accuracy: {test_accuracy:.1f}%, Test metric_score: {test_metric_score:.2f}"
-    )
-    print("***************************************************")
+
+    model.train(False)
+    for i, data in enumerate(testloader):
+        inputs, labels = data[0].to(device), data[1].to(device)
+
+        with torch.no_grad():
+            outputs = model(inputs)
+            correct = torch.sum(labels == torch.argmax(outputs, dim=1)).item()
+
+            accuracy = correct / len(labels) * 100
+
+            loss = criterion(outputs, labels)
+            loss = loss.item()
+
+            metric_score = f1_score(
+                labels.cpu(), torch.argmax(outputs.cpu(), dim=1), zero_division=0
+            )
+
+            auc_score = roc_auc_score(labels.cpu(), torch.argmax(outputs.cpu(), dim=1))
+            print("TEST SET")
+            print(
+                f"Test Loss: {loss:.3f}, Test Accuracy: {accuracy:.1f}%, Test f1_score: {metric_score:.2f}, Test auc_score: {auc_score:.2f}\n"
+            )
+            print(
+                classification_report(
+                    labels.cpu(),
+                    torch.argmax(outputs.cpu(), dim=1),
+                    target_names=["galaxies", "stars"],
+                )
+            )
+            print("***************************************************")
 
     return model

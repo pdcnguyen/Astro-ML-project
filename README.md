@@ -15,4 +15,3 @@ Test Loss: 0.252, Test Accuracy: 88.6%, Test f1_score: 0.92, Test auc_score: 0.8
     macro avg      0.86      0.87      0.86      2132
     weighted avg   0.89      0.89      0.89      2132
 
-***************************************************
